@@ -1,6 +1,11 @@
 import pygame
 import random
 
+def tint_image(image, tint_color):
+    tinted_image = image.copy()
+    tinted_image.fill(tint_color[0:3] + (0,), None, pygame.BLEND_RGBA_MULT)
+    return tinted_image
+
 class Believer(pygame.sprite.Sprite):
     def __init__(self, group, all_sprites):
         super().__init__()
