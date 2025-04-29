@@ -1,6 +1,6 @@
-import pygame
+# Agent class definition here
 import random
-import numpy as np
+import pygame
 
 class Agent(pygame.sprite.Sprite):
     STATES = {
