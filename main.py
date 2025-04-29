@@ -281,23 +281,26 @@ class Game:
             # Draw the counts inside the box, in white
             font32 = pygame.font.SysFont('Concolas', 32)
             font35 = pygame.font.SysFont('Concolas', 35)
-            y0 = self.screen_height - 616 + 20
-            dy = 40
-            
-            def draw_count(label, count, y):
-                label_surf = font32.render(label, True, (0, 0, 0))  # ← currently black
-                count_surf = font35.render(str(count), True, (255, 255, 255))
-                self.screen.blit(label_surf, (self.screen_width - 218 + 10, y))
-                self.screen.blit(count_surf, (self.screen_width - 218 + 150, y))
 
-            draw_count('S:', self.susceptible_count, y0)
-            draw_count('E:', self.exposed_count, y0 + dy)
-            draw_count('B:', self.believer_count, y0 + 2*dy)
-            draw_count('D:', self.doubter_count, y0 + 3*dy)
-            draw_count('R:', self.recovered_count, y0 + 4*dy)
-            draw_count('M:', self.misinformant_count, y0 + 5*dy)
+            # Draw COUNT title above agent list
+            count_title = pygame.font.SysFont('Concolas', 35).render('COUNT', True, (255, 255, 255))
+            self.screen.blit(count_title, (self.screen_width - 180, self.screen_height - 660))
+
+            # Define new function for count drawing
+            def draw_count(label, count, y):
+                label_surf = font32.render(label, True, (255, 255, 255))
+                count_surf = font35.render(str(count), True, (255, 255, 255))
+                self.screen.blit(label_surf, (self.screen_width - 190, y))
+                self.screen.blit(count_surf, (self.screen_width - 60, y))
+
+            # Call with proper vertical spacing
+            draw_count('S:', self.susceptible_count, self.screen_height - 620)
+            draw_count('E:', self.exposed_count, self.screen_height - 580)
+            draw_count('B:', self.believer_count, self.screen_height - 540)
+            draw_count('D:', self.doubter_count, self.screen_height - 500)
+            draw_count('R:', self.recovered_count, self.screen_height - 460)
+            draw_count('M:', self.misinformant_count, self.screen_height - 420)
         
-            pygame.draw.rect(self.screen, (50, 50, 50), pygame.Rect(self.screen_width - 218, self.screen_height - 616, 200, 270))
             points_text = pygame.font.SysFont('Concolas', 50).render(str(self.point_count), True, (255, 255, 255))
             pygame.draw.circle(self.screen, (160, 0, 0), (self.screen_width - 118, self.screen_height - 205), 75)
             self.screen.blit(points_text, (self.screen_width - 128, self.screen_height - 220))
