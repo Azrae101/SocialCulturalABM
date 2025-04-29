@@ -283,8 +283,9 @@ class Game:
             font35 = pygame.font.SysFont('Concolas', 35)
             y0 = self.screen_height - 616 + 20
             dy = 40
+            
             def draw_count(label, count, y):
-                label_surf = font32.render(label, True, (0, 0, 0))
+                label_surf = font32.render(label, True, (0, 0, 0))  # ← currently black
                 count_surf = font35.render(str(count), True, (255, 255, 255))
                 self.screen.blit(label_surf, (self.screen_width - 218 + 10, y))
                 self.screen.blit(count_surf, (self.screen_width - 218 + 150, y))
