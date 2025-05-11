@@ -1,35 +1,124 @@
 import pygame
 import random
 
-def tint_image(image, tint_color):
-    tinted_image = image.copy()
-    tinted_image.fill(tint_color[0:3] + (0,), None, pygame.BLEND_RGBA_MULT)
-    return tinted_image
-
 class Believer(pygame.sprite.Sprite):
+    
     def __init__(self, group, all_sprites):
         super().__init__()
-        self.images = [
-            pygame.image.load('Images/running_right_1.png'),
-            pygame.image.load('Images/running_right_2.png'),
-            pygame.image.load('Images/running_right_3.png')
-        ]
-        self.image_index = 0
-        self.image = pygame.transform.scale(self.images[self.image_index], (30, 30))
-        self.rect = self.image.get_rect(center=(random.randint(50, 900), random.randint(50, 550)))
-        self.speed = random.randint(1, 3)
-        self.direction = pygame.math.Vector2(random.choice([-1, 1]), random.choice([-1, 1])).normalize()
-        self.animation_counter = 0
-        self.influence = random.uniform(0.5, 2.0)
+        
+        def tint_surface(surface, color):
+            """Apply color tint to a surface while preserving transparency"""
+            tint = pygame.Surface(surface.get_size())
+            tint.fill(color)
+            surface = surface.copy()
+            surface.blit(tint, (0, 0), special_flags=pygame.BLEND_MULT)
+            return surface
 
+        self.color = (204, 0, 0)
+        
+        # Animation scale factors - uniform size for all directions
+        self.sprite_scale = (40, 70)  # Same size as other agents
+        
+        # Load and scale animation frames for all directions
+        self.image_list_down = [
+            tint_surface(pygame.transform.scale(
+                pygame.image.load(f'Images/running_down_{i}.png').convert_alpha(),
+                self.sprite_scale
+            ), self.color) for i in range(1, 4)
+        ]
+        self.image_list_up = [
+            tint_surface(pygame.transform.scale(
+                pygame.image.load(f'Images/running_up_{i}.png').convert_alpha(),
+                self.sprite_scale
+            ), self.color) for i in range(1, 4)
+        ]
+        self.image_list_left = [
+            tint_surface(pygame.transform.scale(
+                pygame.image.load(f'Images/running_left_{i}.png').convert_alpha(),
+                self.sprite_scale
+            ), self.color) for i in range(1, 4)
+        ]
+        self.image_list_right = [
+            tint_surface(pygame.transform.scale(
+                pygame.image.load(f'Images/running_right_{i}.png').convert_alpha(),
+                self.sprite_scale
+            ), self.color) for i in range(1, 4)
+        ]
+        
+        # Set initial image and rect
+        self.current_direction = "right"
+        self.animation_index = 0
+        self.image = self.image_list_right[self.animation_index]
+        self.rect = self.image.get_rect(center=(random.randint(50, 900), random.randint(50, 550)))
+        
+        # Movement properties
+        self.speed = random.randint(1, 3)  # Slightly slower than misinformants
+        self.direction_vector = pygame.math.Vector2(random.choice([-1, 1]), random.choice([-1, 1])).normalize()
+        self.animation_counter = 0
+        self.animation_speed = 8  # Slightly slower animation
+        
+        # Agent properties
+        self.influence = random.uniform(0.5, 2.0)  # Lower influence than misinformants
+        
     def update(self):
+        # First handle movement
+        self.handle_movement()
+        
+        # Then update animation
+        self.animate()
+        
+        # Finally handle boundaries
+        self.handle_boundaries()
+    
+    def handle_movement(self):
+        # Move first
+        self.rect.centerx += self.direction_vector.x * self.speed
+        self.rect.centery += self.direction_vector.y * self.speed
+        
+        # Random direction changes (less frequent than misinformants)
+        if random.random() < 0.01:
+            self.change_direction()
+    
+    def animate(self):
         self.animation_counter += 1
-        if self.animation_counter % 10 == 0:
-            self.image_index = (self.image_index + 1) % len(self.images)
-            self.image = pygame.transform.scale(self.images[self.image_index], (30, 30))
-        self.rect.centerx += self.direction.x * self.speed
-        self.rect.centery += self.direction.y * self.speed
+        if self.animation_counter >= self.animation_speed:
+            self.animation_counter = 0
+            self.animation_index = (self.animation_index + 1) % 3
+            self.update_image()
+    
+    def update_image(self):
+        # Select the correct image based on direction
+        if self.current_direction == "down":
+            self.image = self.image_list_down[self.animation_index]
+        elif self.current_direction == "up":
+            self.image = self.image_list_up[self.animation_index]
+        elif self.current_direction == "left":
+            self.image = self.image_list_left[self.animation_index]
+        else:  # right
+            self.image = self.image_list_right[self.animation_index]
+        
+        # Update the rect to match the new image while maintaining position
+        old_center = self.rect.center
+        self.rect = self.image.get_rect()
+        self.rect.center = old_center
+    
+    def handle_boundaries(self):
         if self.rect.left < 0 or self.rect.right > 920:
-            self.direction.x *= -1
+            self.direction_vector.x *= -1
+            self.update_direction_facing()
         if self.rect.top < 0 or self.rect.bottom > 575:
-            self.direction.y *= -1
+            self.direction_vector.y *= -1
+            self.update_direction_facing()
+    
+    def change_direction(self):
+        self.direction_vector = pygame.math.Vector2(
+            random.uniform(-1, 1), 
+            random.uniform(-1, 1)
+        ).normalize()
+        self.update_direction_facing()
+    
+    def update_direction_facing(self):
+        if abs(self.direction_vector.x) > abs(self.direction_vector.y):
+            self.current_direction = "left" if self.direction_vector.x < 0 else "right"
+        else:
+            self.current_direction = "up" if self.direction_vector.y < 0 else "down"

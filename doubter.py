@@ -2,29 +2,135 @@ import pygame
 import random
 
 class Doubter(pygame.sprite.Sprite):
+
+    
     def __init__(self, group, all_sprites):
         super().__init__()
-        self.images = [
-            pygame.image.load('Images/running_up_1.png'),
-            pygame.image.load('Images/running_up_2.png'),
-            pygame.image.load('Images/running_up_3.png')
+        
+        def tint_surface(surface, color):
+            """Apply color tint to a surface while preserving transparency"""
+            tint = pygame.Surface(surface.get_size())
+            tint.fill(color)
+            surface = surface.copy()
+            surface.blit(tint, (0, 0), special_flags=pygame.BLEND_MULT)
+            return surface
+        
+        self.color = (61, 133, 198)
+        
+        # Animation scale factors - uniform size for all directions
+        self.sprite_scale = (40, 70)  # Same size as other agents
+        
+        # Load and scale animation frames for all directions
+        self.image_list_down = [
+            tint_surface(pygame.transform.scale(
+                pygame.image.load(f'Images/running_down_{i}.png').convert_alpha(),
+                self.sprite_scale
+            ), self.color) for i in range(1, 4)
         ]
-        self.image_index = 0
-        self.image = pygame.transform.scale(self.images[self.image_index], (30, 30))
+        self.image_list_up = [
+            tint_surface(pygame.transform.scale(
+                pygame.image.load(f'Images/running_up_{i}.png').convert_alpha(),
+                self.sprite_scale
+            ), self.color) for i in range(1, 4)
+        ]
+        self.image_list_left = [
+            tint_surface(pygame.transform.scale(
+                pygame.image.load(f'Images/running_left_{i}.png').convert_alpha(),
+                self.sprite_scale
+            ), self.color) for i in range(1, 4)
+        ]
+        self.image_list_right = [
+            tint_surface(pygame.transform.scale(
+                pygame.image.load(f'Images/running_right_{i}.png').convert_alpha(),
+                self.sprite_scale
+            ), self.color) for i in range(1, 4)
+        ]
+        
+        # Set initial image and rect
+        self.current_direction = "right"
+        self.animation_index = 0
+        self.image = self.image_list_right[self.animation_index]
         self.rect = self.image.get_rect(center=(random.randint(50, 900), random.randint(50, 550)))
-        self.speed = random.randint(1, 3)
-        self.direction = pygame.math.Vector2(random.choice([-1, 1]), random.choice([-1, 1])).normalize()
+        
+        # Movement properties
+        self.speed = random.randint(1, 3)  # Moderate speed
+        self.direction_vector = pygame.math.Vector2(random.choice([-1, 1]), random.choice([-1, 1])).normalize()
         self.animation_counter = 0
-        self.persuasiveness = random.uniform(0.5, 2.0)
-
+        self.animation_speed = 7  # Moderate animation speed
+        
+        # Doubter properties
+        self.persuasiveness = random.uniform(0.5, 2.0)  # Ability to convert believers
+        self.last_direction_change = 0
+        
     def update(self):
+        # First handle movement
+        self.handle_movement()
+        
+        # Then update animation
+        self.animate()
+        
+        # Finally handle boundaries
+        self.handle_boundaries()
+    
+    def handle_movement(self):
+        # Move first
+        self.rect.centerx += self.direction_vector.x * self.speed
+        self.rect.centery += self.direction_vector.y * self.speed
+        
+        # Doubters change direction based on their persuasiveness
+        # More persuasive = more purposeful movement
+        if random.random() < 0.02 + (0.01 * (2.0 - self.persuasiveness)):
+            self.change_direction()
+    
+    def animate(self):
         self.animation_counter += 1
-        if self.animation_counter % 10 == 0:
-            self.image_index = (self.image_index + 1) % len(self.images)
-            self.image = pygame.transform.scale(self.images[self.image_index], (30, 30))
-        self.rect.centerx += self.direction.x * self.speed
-        self.rect.centery += self.direction.y * self.speed
+        if self.animation_counter >= self.animation_speed:
+            self.animation_counter = 0
+            self.animation_index = (self.animation_index + 1) % 3
+            self.update_image()
+    
+    def update_image(self):
+        # Select the correct image based on direction
+        if self.current_direction == "down":
+            self.image = self.image_list_down[self.animation_index]
+        elif self.current_direction == "up":
+            self.image = self.image_list_up[self.animation_index]
+        elif self.current_direction == "left":
+            self.image = self.image_list_left[self.animation_index]
+        else:  # right
+            self.image = self.image_list_right[self.animation_index]
+        
+        # Update the rect to match the new image while maintaining position
+        old_center = self.rect.center
+        self.rect = self.image.get_rect()
+        self.rect.center = old_center
+    
+    def handle_boundaries(self):
         if self.rect.left < 0 or self.rect.right > 920:
-            self.direction.x *= -1
+            self.direction_vector.x *= -1
+            self.update_direction_facing()
         if self.rect.top < 0 or self.rect.bottom > 575:
-            self.direction.y *= -1
+            self.direction_vector.y *= -1
+            self.update_direction_facing()
+    
+    def change_direction(self):
+        # More persuasive doubters make more purposeful direction changes
+        if self.persuasiveness > 1.5:  # Highly persuasive
+            # Tend to move in more consistent directions
+            self.direction_vector = pygame.math.Vector2(
+                random.uniform(-0.5, 0.5), 
+                random.uniform(-0.5, 0.5)
+            ).normalize()
+        else:  # Less persuasive
+            # More random movement
+            self.direction_vector = pygame.math.Vector2(
+                random.uniform(-1, 1), 
+                random.uniform(-1, 1)
+            ).normalize()
+        self.update_direction_facing()
+    
+    def update_direction_facing(self):
+        if abs(self.direction_vector.x) > abs(self.direction_vector.y):
+            self.current_direction = "left" if self.direction_vector.x < 0 else "right"
+        else:
+            self.current_direction = "up" if self.direction_vector.y < 0 else "down"
