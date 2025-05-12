@@ -2,28 +2,34 @@ import pygame
 import sys
 import random
 from datetime import datetime, timedelta
+import csv
 
 from susceptible import Susceptible
 from exposed import Exposed
 from believer import Believer
 from doubter import Doubter
 from recovered import Recovered
-from misinformant import Misinformant  
+from disinformant import Disinformant  
 
 AGENT_TYPES = [
     ("Susceptible", (106, 168, 79)),
-    ("Exposed", (255, 255, 0)),
-    ("Believer", (204, 0, 0)),
+    #("Exposed", (255, 255, 0)),
+    #("Believer", (204, 0, 0)),
     ("Doubter", (61, 133, 198)),
-    ("Recovered", (128, 128, 128)),
-    ("Misinformant", (180, 0, 180)),
+    #("Recovered", (128, 128, 128)),
+    ("Disinformant", (180, 0, 180)),
+]
+
+OTHER_FACTORS = [
+    ("Emotional Valence", (250, 10, 10)),
+    #("Social Influence", (10, 10, 250)),
 ]
 
 class Clock:
     def __init__(self, x, y):
         self.font = pygame.font.SysFont('Consolas', 32)
         self.position = (x, y)
-        self.simulation_time = datetime(2023, 1, 1, 18, 30)  # Start at 6
+        self.simulation_time = datetime(2023, 1, 1, 6, 30)  # Start at 6
         self.time_multiplier = 6  # 6 game minutes per real second (10 sec/hour)
         self.last_update = pygame.time.get_ticks()
     
@@ -88,7 +94,7 @@ class Slider:
 class Game:
     def __init__(self):
         pygame.init()
-        self.screen_width = 1140
+        self.screen_width = 1400
         self.screen_height = 750
         pygame.display.set_caption("Misinformation Spread Simulation")
         gameIcon = pygame.image.load('Images/running_down_1.png')
@@ -102,9 +108,9 @@ class Game:
         
         # Define environment zones
         self.zones = {
-            "home": pygame.Rect(0, 100, 380, 650),
-            "work": pygame.Rect(380, 100, 380, 650),
-            "social": pygame.Rect(760, 100, 380, 650)
+            "home": pygame.Rect(0, 100, 380, 650),  # Increased width from 380
+            "work": pygame.Rect(390, 100, 380, 650),  # Increased width from 380
+            "social": pygame.Rect(780, 100, 380, 650)  # Moved right, kept similar width
         }
         self.total_misinformed = 0
 
@@ -115,7 +121,7 @@ class Game:
         self.believer_group = pygame.sprite.Group()
         self.doubter_group = pygame.sprite.Group()
         self.recovered_group = pygame.sprite.Group()
-        self.misinformant_group = pygame.sprite.Group()  # Uncomment if you have this agent
+        self.disinformant_group = pygame.sprite.Group()  # Uncomment if you have this agent
 
         # Agent counts
         self.susceptible_count = 0
@@ -123,13 +129,13 @@ class Game:
         self.believer_count = 0
         self.doubter_count = 0
         self.recovered_count = 0
-        self.misinformant_count = 0
+        self.disinformant_count = 0
 
         # Initialize button click flags
         self.add_susceptible = False
         self.add_believer = False
         self.add_doubter = False
-        self.add_misinformant = False
+        self.add_disinformant = False
 
         self.point_count = 0
         self.spawn = pygame.Rect(self.screen_width - 1140, self.screen_height - 800, 920, 605)
@@ -140,6 +146,10 @@ class Game:
         y = 120
         for name, color in AGENT_TYPES:
             sliders.append(Slider(200, y, 0, 30, color, name, font))
+            y += 80
+        
+        for name, color in OTHER_FACTORS:
+            sliders.append(Slider(200, y, 0, 10, color, name, font))
             y += 80
 
         start_button = pygame.Rect(500, y + 50, 200, 60)
@@ -192,11 +202,11 @@ class Game:
             self.all_sprites.add(new_rec)
             self.recovered_group.add(new_rec)
             self.recovered_count += 1
-        for _ in range(counts.get("Misinformant", 0)):
-             new_misinfo = Misinformant(self.misinformant_group, self.all_sprites)
+        for _ in range(counts.get("Disinformant", 0)):
+             new_misinfo = Disinformant(self.disinformant_group, self.all_sprites)
              self.all_sprites.add(new_misinfo)
-             self.misinformant_group.add(new_misinfo)
-             self.misinformant_count += 1
+             self.disinformant_group.add(new_misinfo)
+             self.disinformant_count += 1
 
     def draw_zones(self):
         # Draw zone backgrounds
@@ -219,6 +229,24 @@ class Game:
         pygame.draw.rect(self.screen, (0, 0, 0), self.zones["work"], 2)
         pygame.draw.rect(self.screen, (0, 0, 0), self.zones["social"], 2)
     
+    def enforce_zone_boundaries(self, agent):
+        """Keep agent within their current zone boundaries"""
+        current_zone = None
+        
+        # Determine which zone the agent is in
+        for zone_name, zone_rect in self.zones.items():
+            if zone_rect.collidepoint(agent.rect.center):
+                current_zone = zone_rect
+                break
+        
+        if current_zone:
+            # Keep agent within zone boundaries with some padding
+            padding = 10  # Small buffer from edges
+            agent.rect.left = max(agent.rect.left, current_zone.left + padding)
+            agent.rect.right = min(agent.rect.right, current_zone.right - padding)
+            agent.rect.top = max(agent.rect.top, current_zone.top + padding)
+            agent.rect.bottom = min(agent.rect.bottom, current_zone.bottom - padding)
+
     def update_agent_locations(self):
         current_hour = self.game_clock.get_hour()
         current_minute = self.game_clock.get_minute()
@@ -272,25 +300,63 @@ class Game:
                     self.move_agent_to_zone(agent, zone)
 
     def move_agent_to_zone(self, agent, zone):
-        buffer = 20  # Same buffer as in agent class
-        new_x = random.randint(zone.left + buffer, zone.right - buffer)
-        new_y = random.randint(zone.top + buffer, zone.bottom - buffer)
+        padding = 10  # Same padding as enforce_zone_boundaries
+        new_x = random.randint(zone.left + padding, zone.right - padding)
+        new_y = random.randint(zone.top + padding, zone.bottom - padding)
         agent.rect.center = (new_x, new_y)
         
         # Reset direction to prevent immediate boundary collision
         agent.direction_vector = pygame.math.Vector2(
-            random.choice([-0.5, 0.5]),  # Smaller initial values
+            random.choice([-0.5, 0.5]),
             random.choice([-0.5, 0.5])
         ).normalize()
+
+    def setup_logging(self):
+        """Initialize logging system with CSV file"""
+        self.log_file = open('simulation_log.csv', 'w', newline='')
+        self.log_writer = csv.writer(self.log_file)
+        # Write header row
+        self.log_writer.writerow([
+            'Time', 
+            'Susceptible', 
+            'Exposed', 
+            'Believer', 
+            'Doubter', 
+            'Recovered', 
+            'Disinformant',
+            'Total_Misinformed'
+        ])
+        self.last_log_time = -1  # Initialize to ensure first log at 00:00
+
+    def log_current_state(self, current_time):
+        """Log current agent counts to file"""
+        time_str = current_time.strftime("%H:%M")
+        self.log_writer.writerow([
+            time_str,
+            self.susceptible_count,
+            self.exposed_count,
+            self.believer_count,
+            self.doubter_count,
+            self.recovered_count,
+            self.disinformant_count,
+            self.total_misinformed
+        ])
+        self.log_file.flush()  # Ensure data is written to disk
 
     def run(self):
         characters = 0
         counts = self.setup_screen()
         self.initialize_agents(counts)
+        self.setup_logging()  # Initialize logging system
         running = True
 
         while running:
             self.game_clock.update()
+            # Log every 10 minutes
+            current_minute = self.game_clock.get_minute()
+            if current_minute % 10 == 0 and current_minute != self.last_log_time:
+                self.log_current_state(self.game_clock.simulation_time)
+                self.last_log_time = current_minute
             current_hour = self.game_clock.get_hour()
             current_minute = self.game_clock.get_minute()
 
@@ -301,85 +367,71 @@ class Game:
             # Update agents except during deep sleep (00:00-06:00)
             if not (0 <= current_hour < 6):
                 self.all_sprites.update()
+                #self.all_sprites.update(zones=self.zones)
 
-                self.update_agent_locations()
+                for agent in self.all_sprites:
+                    self.enforce_zone_boundaries(agent)
                 
+                self.update_agent_locations()   
+
                 # Only process interactions after 7:00 or during wake-up time (6:45-7:00)
-                if current_hour >= 7 or (current_hour == 6 and current_minute >= 30):
-                    # Susceptible + Believer -> Exposed
-                    for sus in self.susceptible_group:
-                        for bel in self.believer_group:
-                            if pygame.sprite.collide_rect(sus, bel):
-                                if random.random() < 0.1 * bel.influence:
-                                    sus.kill()
-                                    self.susceptible_count -= 1
-                                    new_exp = Exposed(self.exposed_group, self.all_sprites)
-                                    new_exp.rect.center = sus.rect.center
-                                    self.all_sprites.add(new_exp)
-                                    self.exposed_group.add(new_exp)
-                                    self.exposed_count += 1
-            
-            # Misinformation spread mechanics here (same as before)
-            # Example: Susceptible + Believer -> Exposed
-            for sus in self.susceptible_group:
-                for bel in self.believer_group:
-                    if pygame.sprite.collide_rect(sus, bel):
-                        if random.random() < 0.1 * bel.influence:
-                            sus.kill()
-                            self.susceptible_count -= 1
-                            new_exp = Exposed(self.exposed_group, self.all_sprites)
-                            new_exp.rect.center = sus.rect.center
-                            self.all_sprites.add(new_exp)
-                            self.exposed_group.add(new_exp)
-                            self.exposed_count += 1
-            
-            # Exposed -> Believer or Doubter after exposure time
-            for exp in self.exposed_group:
-                if exp.exposure_time > 180:
-                    if random.random() < 0.7 - (0.4 * exp.skepticism):
-                        exp.kill()
-                        self.exposed_count -= 1
-                        new_bel = Believer(self.believer_group, self.all_sprites)
-                        new_bel.rect.center = exp.rect.center
-                        self.all_sprites.add(new_bel)
-                        self.believer_group.add(new_bel)
-                        self.believer_count += 1
-                        self.total_misinformed = self.believer_count + self.misinformant_count
-                    else:
-                        exp.kill()
-                        self.exposed_count -= 1
-                        new_doub = Doubter(self.doubter_group, self.all_sprites)
-                        new_doub.rect.center = exp.rect.center
-                        self.all_sprites.add(new_doub)
-                        self.doubter_group.add(new_doub)
-                        self.doubter_count += 1
-            
-            for doub in self.doubter_group:
-                for bel in self.believer_group:
-                    if pygame.sprite.collide_rect(doub, bel):
-                        if random.random() < 0.1 * doub.persuasiveness:
-                            bel.kill()
-                            self.believer_count -= 1
-                            new_rec = Recovered(self.recovered_group, self.all_sprites)
-                            new_rec.rect.center = bel.rect.center
-                            self.all_sprites.add(new_rec)
-                            self.recovered_group.add(new_rec)
-                            self.recovered_count += 1
-            
-            for bel in self.believer_group:
-                if random.random() < 0.01:
-                    bel.kill()
-                    self.believer_count -= 1
-                    new_rec = Recovered(self.recovered_group, self.all_sprites)
-                    new_rec.rect.center = bel.rect.center
-                    self.all_sprites.add(new_rec)
-                    self.recovered_group.add(new_rec)
-                    self.recovered_count += 1
+                #if current_hour >= 7 or (current_hour == 6 and current_minute >= 30):
+                
+                # Susceptible + Believer -> Exposed
+                for sus in self.susceptible_group:
+                    for bel in self.believer_group:
+                        if pygame.sprite.collide_rect(sus, bel):
+                            prob = 0.1 * bel.influence * (1 + sus.emotional_valence)
+                            if random.random() < prob:
+                                sus.kill()
+                                self.susceptible_count -= 1
+                                new_exp = Exposed(self.exposed_group, self.all_sprites)
+                                new_exp.rect.center = sus.rect.center
+                                new_exp.emotional_valence = sus.emotional_valence  # carry over
+                                self.all_sprites.add(new_exp)
+                                self.exposed_group.add(new_exp)
+                                self.exposed_count += 1
+
+                # Exposed -> Believer or Doubter after exposure time
+                for exp in self.exposed_group:
+                    if exp.exposure_time > 180:
+                        prob = (0.7 - 0.4 * exp.skepticism) * (1 + exp.emotional_valence)
+                        if random.random() < prob:
+                            exp.kill()
+                            self.exposed_count -= 1
+                            new_bel = Believer(self.believer_group, self.all_sprites)
+                            new_bel.rect.center = exp.rect.center
+                            new_bel.emotional_valence = exp.emotional_valence
+                            self.all_sprites.add(new_bel)
+                            self.believer_group.add(new_bel)
+                            self.believer_count += 1
+                            self.total_misinformed = self.believer_count + self.disinformant_count
+                        else:
+                            exp.kill()
+                            self.exposed_count -= 1
+                            new_doub = Doubter(self.doubter_group, self.all_sprites)
+                            new_doub.rect.center = exp.rect.center
+                            new_doub.emotional_valence = exp.emotional_valence
+                            self.all_sprites.add(new_doub)
+                            self.doubter_group.add(new_doub)
+                            self.doubter_count += 1
+                
+                for doub in self.doubter_group:
+                    for bel in self.believer_group:
+                        if pygame.sprite.collide_rect(doub, bel):
+                            if random.random() < 0.1 * doub.persuasiveness:
+                                bel.kill()
+                                self.believer_count -= 1
+                                new_rec = Recovered(self.recovered_group, self.all_sprites)
+                                new_rec.rect.center = bel.rect.center
+                                self.all_sprites.add(new_rec)
+                                self.recovered_group.add(new_rec)
+                                self.recovered_count += 1
 
             characters = (self.susceptible_count + self.exposed_count +
                         self.believer_count + self.doubter_count + self.recovered_count)
             self.point_count = self.doubter_count * 2 + self.recovered_count * 3 - self.believer_count
-            self.total_misinformed = self.believer_count + self.misinformant_count
+            self.total_misinformed = self.believer_count + self.disinformant_count
 
             # --- Drawing ---
             self.screen.fill((255, 255, 255))
@@ -399,46 +451,48 @@ class Game:
                     # Normal drawing for active agents
                     self.all_sprites.draw(self.screen)
 
-            pygame.display.flip()
-            self.clock.tick(self.fps)
-
-        '''
-
             # Interface:
             # Draw the stats box first
-            stats_box_rect = pygame.Rect(self.screen_width - 218, self.screen_height - 640, 200, 300)
+            stats_box_rect = pygame.Rect(self.screen_width - 220, self.screen_height - 640, 180, 300)  # Narrower (180px) and further right
             pygame.draw.rect(self.screen, (50, 50, 50), stats_box_rect)
-
-            # MISINFORMED section
-            pygame.draw.circle(self.screen, (160, 0, 0), (self.screen_width - 118, self.screen_height - 205), 75)
-            points_label = pygame.font.SysFont('Concolas', 35).render('Misinformed', True, (20, 20, 10))
-            points_text = pygame.font.SysFont('Concolas', 50).render(str(self.total_misinformed), True, (255, 255, 255))
-            self.screen.blit(points_label, (self.screen_width - 180, self.screen_height - 320))
-            self.screen.blit(points_text, (self.screen_width - 128, self.screen_height - 220))
 
             # Draw the counts inside the box, in white
             font32 = pygame.font.SysFont('Concolas', 32)
             font35 = pygame.font.SysFont('Concolas', 35)
 
-            # Draw COUNT title above agent list
-            count_title = pygame.font.SysFont('Concolas', 35).render('COUNT', True, (255, 255, 255))
-            self.screen.blit(count_title, (self.screen_width - 180, self.screen_height - 660))
+            # MISINFORMED section (adjust positions relative to the new box)
+            pygame.draw.circle(self.screen, (160, 0, 0), (self.screen_width - 130, self.screen_height - 205), 65)  # Smaller circle (65 radius)
+            points_label = pygame.font.SysFont('Concolas', 30).render('Misinformed', True, (20, 20, 10))  # Smaller font
+            points_text = pygame.font.SysFont('Concolas', 45).render(str(self.total_misinformed), True, (255, 255, 255))  # Smaller font
+            self.screen.blit(points_label, (self.screen_width - 210, self.screen_height - 320))  # Adjusted position
+            self.screen.blit(points_text, (self.screen_width - 145, self.screen_height - 220))  # Adjusted position
 
-            # Define new function for count drawing
+            # COUNT title
+            count_title = pygame.font.SysFont('Concolas', 30).render('COUNT', True, (255, 255, 255))  # Smaller font
+            self.screen.blit(count_title, (self.screen_width - 200, self.screen_height - 660))  # Adjusted position
+
+            # Update the draw_count function for narrower layout:
             def draw_count(label, count, y):
                 label_surf = font32.render(label, True, (255, 255, 255))
                 count_surf = font35.render(str(count), True, (255, 255, 255))
-                self.screen.blit(label_surf, (self.screen_width - 190, y))
-                self.screen.blit(count_surf, (self.screen_width - 60, y))
-
+                self.screen.blit(label_surf, (self.screen_width - 210, y))  # Adjusted left position
+                self.screen.blit(count_surf, (self.screen_width - 120, y))  # Adjusted right position
+                
             # Call with proper vertical spacing
-            draw_count('S:', self.susceptible_count, self.screen_height - 620)
-            draw_count('E:', self.exposed_count, self.screen_height - 580)
-            draw_count('B:', self.believer_count, self.screen_height - 540)
-            draw_count('D:', self.doubter_count, self.screen_height - 500)
-            draw_count('R:', self.recovered_count, self.screen_height - 460)
-            draw_count('M:', self.misinformant_count, self.screen_height - 420)
-        '''
+            draw_count('SU:', self.susceptible_count, self.screen_height - 620)
+            draw_count('EX:', self.exposed_count, self.screen_height - 580)
+            draw_count('BE:', self.believer_count, self.screen_height - 540)
+            draw_count('DO:', self.doubter_count, self.screen_height - 500)
+            draw_count('RE:', self.recovered_count, self.screen_height - 460)
+            draw_count('DI:', self.disinformant_count, self.screen_height - 420)
+
+            pygame.display.flip()
+            self.clock.tick(self.fps)
+
+            def __del__(self):
+                """Cleanup method to close log file"""
+                if hasattr(self, 'log_file'):
+                    self.log_file.close()
 
 if __name__ == "__main__":
     game = Game()

@@ -1,7 +1,7 @@
 import pygame
 import random
 
-class Misinformant(pygame.sprite.Sprite):
+class Disinformant(pygame.sprite.Sprite):
     
     def __init__(self, group, all_sprites):
         super().__init__()
