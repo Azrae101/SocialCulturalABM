@@ -3,6 +3,8 @@ import sys
 import random
 from datetime import datetime, timedelta
 import csv
+import numpy as np
+from scipy.stats import beta
 
 from susceptible import Susceptible
 from exposed import Exposed
@@ -10,6 +12,45 @@ from believer import Believer
 from doubter import Doubter
 from recovered import Recovered
 from disinformant import Disinformant  
+
+def change_probability(agent, influencer=None, environment_factor=1.0, misinformant_exposure=0):
+    """
+    Calculate the probability of an agent changing state.
+    - agent: the agent being influenced (must have .emotional_valence, .skepticism, etc.)
+    - influencer: the influencing agent (must have .influence if present)
+    - environment_factor: float, multiplier for environmental context (e.g., higher in social media zone)
+    - misinformant_exposure: int, number of recent exposures to misinformants
+    Returns: probability (float between 0 and 1)
+    """
+    # Emotional valence: higher valence = more likely to change (Beta(2, 2) is a reasonable prior)
+    valence_prob = beta.cdf(agent.emotional_valence, 2, 2)
+    
+    # Influence: from influencer (if present), otherwise default
+    influence = getattr(influencer, 'influence', 1.0) if influencer else 1.0
+    
+    # Skepticism: higher means less likely to change
+    skepticism = getattr(agent, 'skepticism', 0.5)
+    skepticism_factor = 1.0 - skepticism  # 0 = never change, 1 = always change
+    
+    # Misinformant exposure: each exposure increases chance by 5% (capped at +25%)
+    misinfo_bonus = min(0.05 * misinformant_exposure, 0.25)
+    
+    # Environment: e.g., 1.2 in social media, 1.0 elsewhere
+    env = environment_factor
+    
+    # Combine all factors
+    base_prob = 0.2  # Base probability for susceptible/exposed
+    prob = base_prob * influence * valence_prob * skepticism_factor * env
+    prob += misinfo_bonus
+
+    # Make it rare for Doubters to become Believers
+    if agent.__class__.__name__ == "Doubter" and (
+        influencer and influencer.__class__.__name__ in ["Believer", "Disinformant"]
+    ):
+        prob *= 0.05  # Only 5% of the already small probability
+
+    # Clamp between 0 and 1
+    return max(0.0, min(1.0, prob))
 
 AGENT_TYPES = [
     ("Susceptible", (106, 168, 79)),
@@ -402,8 +443,7 @@ class Game:
                     running = False
             
             # Update agents except during deep sleep (00:00-06:00)
-            #if not (0 <= current_hour < 6):
-            if True:
+            if not (0 <= current_hour < 6):
                 self.all_sprites.update()
                 #self.all_sprites.update(zones=self.zones)
 
@@ -416,106 +456,144 @@ class Game:
                 for susceptible in list(self.susceptible_group):
                     for disinformant in list(self.disinformant_group):
                         if pygame.sprite.collide_rect(susceptible, disinformant):
-                            print("CONVERTING SUSCEPTIBLE TO EXPOSED (Disinformant)")
-                            new_exposed = Exposed(self.exposed_group, self.all_sprites)
-                            new_exposed.rect.center = susceptible.rect.center
-                            new_exposed.emotional_valence = susceptible.emotional_valence
-                            new_exposed.skepticism = susceptible.skepticism
-                            susceptible.kill()
-                            self.susceptible_count -= 1
-                            self.all_sprites.add(new_exposed)
-                            self.exposed_group.add(new_exposed)
-                            self.exposed_count += 1
-                            disinformant.rect.x += random.choice([-5, 5])
-                            disinformant.rect.y += random.choice([-5, 5])
+                            prob = change_probability(
+                                susceptible,
+                                influencer=disinformant,
+                                environment_factor=1.2 if self.zones["social"].collidepoint(susceptible.rect.center) else 1.0,
+                                misinformant_exposure=1  # or track actual exposures if you wish
+                            )
+                            if np.random.rand() < prob:
+                                print("CONVERTING SUSCEPTIBLE TO EXPOSED (Disinformant)")
+                                new_exposed = Exposed(self.exposed_group, self.all_sprites)
+                                new_exposed.rect.center = susceptible.rect.center
+                                new_exposed.emotional_valence = susceptible.emotional_valence
+                                new_exposed.skepticism = susceptible.skepticism
+                                susceptible.kill()
+                                self.susceptible_count -= 1
+                                self.all_sprites.add(new_exposed)
+                                self.exposed_group.add(new_exposed)
+                                self.exposed_count += 1
+                                disinformant.rect.x += random.choice([-5, 5])
+                                disinformant.rect.y += random.choice([-5, 5])
                             break
 
                 # SUSCEPTIBLE + BELIEVER -> EXPOSED
                 for susceptible in list(self.susceptible_group):
                     for believer in list(self.believer_group):
                         if pygame.sprite.collide_rect(susceptible, believer):
-                            print("CONVERTING SUSCEPTIBLE TO EXPOSED (Believer)")
-                            new_exposed = Exposed(self.exposed_group, self.all_sprites)
-                            new_exposed.rect.center = susceptible.rect.center
-                            new_exposed.emotional_valence = susceptible.emotional_valence
-                            new_exposed.skepticism = susceptible.skepticism
-                            susceptible.kill()
-                            self.susceptible_count -= 1
-                            self.all_sprites.add(new_exposed)
-                            self.exposed_group.add(new_exposed)
-                            self.exposed_count += 1
-                            believer.rect.x += random.choice([-5, 5])
-                            believer.rect.y += random.choice([-5, 5])
+                            prob = change_probability(
+                                susceptible,
+                                influencer=believer,
+                                environment_factor=1.2 if self.zones["social"].collidepoint(susceptible.rect.center) else 1.0
+                            )
+                            if np.random.rand() < prob:
+                                print("CONVERTING SUSCEPTIBLE TO EXPOSED (Believer)")
+                                new_exposed = Exposed(self.exposed_group, self.all_sprites)
+                                new_exposed.rect.center = susceptible.rect.center
+                                new_exposed.emotional_valence = susceptible.emotional_valence
+                                new_exposed.skepticism = susceptible.skepticism
+                                susceptible.kill()
+                                self.susceptible_count -= 1
+                                self.all_sprites.add(new_exposed)
+                                self.exposed_group.add(new_exposed)
+                                self.exposed_count += 1
+                                believer.rect.x += random.choice([-5, 5])
+                                believer.rect.y += random.choice([-5, 5])
                             break
-                
+
                 # EXPOSED + BELIEVER -> BELIEVER (exposed becomes believer faster)
                 for exposed in list(self.exposed_group):
                     for believer in list(self.believer_group):
                         if pygame.sprite.collide_rect(exposed, believer):
-                            print("CONVERTING EXPOSED TO BELIEVER (Believer contact)")
-                            new_believer = Believer(self.believer_group, self.all_sprites)
-                            new_believer.rect.center = exposed.rect.center
-                            new_believer.emotional_valence = exposed.emotional_valence
-                            exposed.kill()
-                            self.exposed_count -= 1
-                            self.all_sprites.add(new_believer)
-                            self.believer_group.add(new_believer)
-                            self.believer_count += 1
-                            believer.rect.x += random.choice([-5, 5])
-                            believer.rect.y += random.choice([-5, 5])
+                            prob = change_probability(
+                                exposed,
+                                influencer=believer,
+                                environment_factor=1.2 if self.zones["social"].collidepoint(exposed.rect.center) else 1.0
+                            )
+                            if np.random.rand() < prob:
+                                print("CONVERTING EXPOSED TO BELIEVER (Believer contact)")
+                                new_believer = Believer(self.believer_group, self.all_sprites)
+                                new_believer.rect.center = exposed.rect.center
+                                new_believer.emotional_valence = exposed.emotional_valence
+                                exposed.kill()
+                                self.exposed_count -= 1
+                                self.all_sprites.add(new_believer)
+                                self.believer_group.add(new_believer)
+                                self.believer_count += 1
+                                believer.rect.x += random.choice([-5, 5])
+                                believer.rect.y += random.choice([-5, 5])
                             break
-                
+
                 # EXPOSED + DOUBTER -> DOUBTER (exposed becomes doubter)
                 for exposed in list(self.exposed_group):
                     for doubter in list(self.doubter_group):
                         if pygame.sprite.collide_rect(exposed, doubter):
-                            print("CONVERTING EXPOSED TO DOUBTER (Doubter contact)")
-                            new_doubter = Doubter(self.doubter_group, self.all_sprites)
-                            new_doubter.rect.center = exposed.rect.center
-                            new_doubter.emotional_valence = exposed.emotional_valence
-                            exposed.kill()
-                            self.exposed_count -= 1
-                            self.all_sprites.add(new_doubter)
-                            self.doubter_group.add(new_doubter)
-                            self.doubter_count += 1
-                            doubter.rect.x += random.choice([-5, 5])
-                            doubter.rect.y += random.choice([-5, 5])
+                            prob = change_probability(
+                                exposed,
+                                influencer=doubter,
+                                environment_factor=1.2 if self.zones["social"].collidepoint(exposed.rect.center) else 1.0
+                            )
+                            if np.random.rand() < prob:
+                                print("CONVERTING EXPOSED TO DOUBTER (Doubter contact)")
+                                new_doubter = Doubter(self.doubter_group, self.all_sprites)
+                                new_doubter.rect.center = exposed.rect.center
+                                new_doubter.emotional_valence = exposed.emotional_valence
+                                exposed.kill()
+                                self.exposed_count -= 1
+                                self.all_sprites.add(new_doubter)
+                                self.doubter_group.add(new_doubter)
+                                self.doubter_count += 1
+                                doubter.rect.x += random.choice([-5, 5])
+                                doubter.rect.y += random.choice([-5, 5])
                             break
 
                 # BELIEVER + DOUBTER -> RECOVERED (believer becomes recovered)
                 for doubter in list(self.doubter_group):
                     for believer in list(self.believer_group):
                         if pygame.sprite.collide_rect(doubter, believer):
-                            print("CONVERTING BELIEVER TO RECOVERED (Doubter contact)")
-                            new_recovered = Recovered(self.recovered_group, self.all_sprites)
-                            new_recovered.rect.center = believer.rect.center
-                            believer.kill()
-                            self.believer_count -= 1
-                            self.all_sprites.add(new_recovered)
-                            self.recovered_group.add(new_recovered)
-                            self.recovered_count += 1
-                            doubter.rect.x += random.choice([-5, 5])
-                            doubter.rect.y += random.choice([-5, 5])
+                            prob = change_probability(
+                                believer,
+                                influencer=doubter,
+                                environment_factor=1.2 if self.zones["social"].collidepoint(believer.rect.center) else 1.0
+                            )
+                            if np.random.rand() < prob:
+                                print("CONVERTING BELIEVER TO RECOVERED (Doubter contact)")
+                                new_recovered = Recovered(self.recovered_group, self.all_sprites)
+                                new_recovered.rect.center = believer.rect.center
+                                believer.kill()
+                                self.believer_count -= 1
+                                self.all_sprites.add(new_recovered)
+                                self.recovered_group.add(new_recovered)
+                                self.recovered_count += 1
+                                doubter.rect.x += random.choice([-5, 5])
+                                doubter.rect.y += random.choice([-5, 5])
                             break
-                
+
                 # DOUBTER + DISINFORMANT -> BELIEVER (doubter gets convinced)
                 for doubter in list(self.doubter_group):
                     for disinformant in list(self.disinformant_group):
                         if pygame.sprite.collide_rect(doubter, disinformant):
-                            print("CONVERTING DOUBTER TO BELIEVER (Disinformant contact)")
-                            new_believer = Believer(self.believer_group, self.all_sprites)
-                            new_believer.rect.center = doubter.rect.center
-                            new_believer.emotional_valence = doubter.emotional_valence
-                            doubter.kill()
-                            self.doubter_count -= 1
-                            self.all_sprites.add(new_believer)
-                            self.believer_group.add(new_believer)
-                            self.believer_count += 1
-                            disinformant.rect.x += random.choice([-5, 5])
-                            disinformant.rect.y += random.choice([-5, 5])
+                            prob = change_probability(
+                                doubter,
+                                influencer=disinformant,
+                                environment_factor=1.2 if self.zones["social"].collidepoint(doubter.rect.center) else 1.0,
+                                misinformant_exposure=1
+                            )
+                            if np.random.rand() < prob:
+                                print("CONVERTING DOUBTER TO BELIEVER (Disinformant contact)")
+                                new_believer = Believer(self.believer_group, self.all_sprites)
+                                new_believer.rect.center = doubter.rect.center
+                                new_believer.emotional_valence = doubter.emotional_valence
+                                doubter.kill()
+                                self.doubter_count -= 1
+                                self.all_sprites.add(new_believer)
+                                self.believer_group.add(new_believer)
+                                self.believer_count += 1
+                                disinformant.rect.x += random.choice([-5, 5])
+                                disinformant.rect.y += random.choice([-5, 5])
                             break
             
-            self.total_misinformed = self.believer_count
+            self.total_misinformed = self.believer_count + self.exposed_count
 
             # --- Drawing ---
             for sprite in self.all_sprites:

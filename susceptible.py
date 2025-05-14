@@ -64,10 +64,10 @@ class Susceptible(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=(random.randint(50, 900), random.randint(50, 550)))
         
         # Movement properties
-        self.speed = random.randint(8, 14)  # Slightly faster movement to appear more "active"
+        self.speed = random.randint(2, 4)
         self.direction_vector = pygame.math.Vector2(random.choice([-1, 1]), random.choice([-1, 1])).normalize()
         self.animation_counter = 0
-        self.animation_speed = 6  # Faster animation to appear more "nervous"
+        self.animation_speed = 5 # Faster animation to appear more "nervous"
         
         # Susceptibility properties
         self.skepticism = random.uniform(0.2, 0.8)  # Individual skepticism level
@@ -94,8 +94,8 @@ class Susceptible(pygame.sprite.Sprite):
     def handle_collision(self, other):
         # Generate a random vector
         normal = pygame.math.Vector2(random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5))
-        if normal.length() == 0:
-            normal = pygame.math.Vector2(1, 0)  # Default to x-axis if zero
+        if normal.length() < 1e-6:
+            normal = pygame.math.Vector2(1, 0)  # Default to x-axis if near zero
         self.direction_vector = self.direction_vector.reflect(normal).normalize()
         self.update_direction_facing()
     
