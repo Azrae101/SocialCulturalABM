@@ -1,10 +1,19 @@
 import pygame
 import random
 
+class BaseAgent(pygame.sprite.Sprite):
+    def handle_collision(self, other):
+        """Default collision handling for all agents"""
+        self.direction_vector = self.direction_vector.reflect(
+            pygame.math.Vector2(random.uniform(-0.2, 0.2), random.uniform(-0.2, 0.2))
+        ).normalize()
+        self.update_direction_facing()
+
 class Exposed(pygame.sprite.Sprite):
     
     def __init__(self, group, all_sprites):
         super().__init__()
+        self.all_sprites = all_sprites 
         
         def tint_surface(surface, color):
             """Apply color tint to a surface while preserving transparency"""
@@ -71,7 +80,31 @@ class Exposed(pygame.sprite.Sprite):
             "right": self.image_list_right.copy()
         }
         
+    def check_collisions(self):
+        collisions = pygame.sprite.spritecollide(
+            self, 
+            self.all_sprites, 
+            False,
+            collided=pygame.sprite.collide_rect_ratio(0.8)  # Add collision threshold
+        )
+        for other in collisions:
+            if other != self:
+                self.handle_collision(other)  # Match renamed method
+                break
+
+    def handle_collision(self, other):
+        # Reverse direction with random perturbation
+        self.direction_vector = self.direction_vector.reflect(
+            pygame.math.Vector2(random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5))
+        ).normalize()
+    
     def update(self):
+        self.handle_movement()
+        self.animate()
+        self.handle_boundaries()
+        self.check_collisions()  # New collision check
+        
+        self.update_direction_facing()
         # First update exposure time and visual effects
         self.update_exposure()
         

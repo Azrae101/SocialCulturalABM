@@ -2,10 +2,19 @@ import pygame
 import random
 import math
 
+class BaseAgent(pygame.sprite.Sprite):
+    def handle_collision(self, other):
+        """Default collision handling for all agents"""
+        self.direction_vector = self.direction_vector.reflect(
+            pygame.math.Vector2(random.uniform(-0.2, 0.2), random.uniform(-0.2, 0.2))
+        ).normalize()
+        self.update_direction_facing()
+
 class Recovered(pygame.sprite.Sprite):
     def __init__(self, group, all_sprites):
         super().__init__()
-        
+        self.all_sprites = all_sprites 
+
         def tint_surface(surface, color):
             """Apply color tint to a surface while preserving transparency"""
             tint = pygame.Surface(surface.get_size())
@@ -52,7 +61,7 @@ class Recovered(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=(random.randint(50, 900), random.randint(50, 550)))
         
         # Movement properties
-        self.speed = random.randint(1, 3)  # Moderate speed
+        self.speed = random.randint(8, 14)
         self.direction_vector = pygame.math.Vector2(random.choice([-1, 1]), random.choice([-1, 1])).normalize()
         self.animation_counter = 0
         self.animation_speed = 10  # Slower animation for recovered agents
@@ -66,6 +75,31 @@ class Recovered(pygame.sprite.Sprite):
         # Recovered agents are less active
         self.last_direction_change = 0
     
+    def update(self):
+        self.handle_movement()
+        self.animate()
+        self.handle_boundaries()
+        self.check_collisions()  # New collision check
+
+    def check_collisions(self):
+        collisions = pygame.sprite.spritecollide(
+            self, 
+            self.all_sprites, 
+            False,
+            collided=pygame.sprite.collide_rect_ratio(0.8)  # Add collision threshold
+        )
+        for other in collisions:
+            if other != self:
+                self.handle_collision(other)  # Match renamed method
+                break
+
+    def handle_collision(self, other):
+        # Reverse direction with random perturbation
+        self.direction_vector = self.direction_vector.reflect(
+            pygame.math.Vector2(random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5))
+        ).normalize()
+        self.update_direction_facing()
+
     def update(self, zones=None):
         self.handle_movement()
         self.animate()

@@ -115,6 +115,7 @@ class Game:
         self.total_misinformed = 0
 
         # Sprite groups
+        self.collision_group = pygame.sprite.Group()  # New group for collision checks
         self.all_sprites = pygame.sprite.Group()
         self.susceptible_group = pygame.sprite.Group()
         self.exposed_group = pygame.sprite.Group()
@@ -177,36 +178,26 @@ class Game:
         return {slider.label: slider.value for slider in sliders}
 
     def initialize_agents(self, counts):
-        for _ in range(counts.get("Susceptible", 0)):
-            new_sus = Susceptible(self.susceptible_group, self.all_sprites)
-            self.all_sprites.add(new_sus)
-            self.susceptible_group.add(new_sus)
-            self.susceptible_count += 1
-        for _ in range(counts.get("Exposed", 0)):
-            new_exp = Exposed(self.exposed_group, self.all_sprites)
-            self.all_sprites.add(new_exp)
-            self.exposed_group.add(new_exp)
-            self.exposed_count += 1
-        for _ in range(counts.get("Believer", 0)):
-            new_bel = Believer(self.believer_group, self.all_sprites)
-            self.all_sprites.add(new_bel)
-            self.believer_group.add(new_bel)
-            self.believer_count += 1
-        for _ in range(counts.get("Doubter", 0)):
-            new_doub = Doubter(self.doubter_group, self.all_sprites)
-            self.all_sprites.add(new_doub)
-            self.doubter_group.add(new_doub)
-            self.doubter_count += 1
-        for _ in range(counts.get("Recovered", 0)):
-            new_rec = Recovered(self.recovered_group, self.all_sprites)
-            self.all_sprites.add(new_rec)
-            self.recovered_group.add(new_rec)
-            self.recovered_count += 1
-        for _ in range(counts.get("Disinformant", 0)):
-             new_misinfo = Disinformant(self.disinformant_group, self.all_sprites)
-             self.all_sprites.add(new_misinfo)
-             self.disinformant_group.add(new_misinfo)
-             self.disinformant_count += 1
+        # Map agent type names to their classes and groups
+        agent_class_map = {
+            "Susceptible": (Susceptible, self.susceptible_group, "susceptible_count"),
+            "Exposed": (Exposed, self.exposed_group, "exposed_count"),
+            "Believer": (Believer, self.believer_group, "believer_count"),
+            "Doubter": (Doubter, self.doubter_group, "doubter_count"),
+            "Recovered": (Recovered, self.recovered_group, "recovered_count"),
+            "Disinformant": (Disinformant, self.disinformant_group, "disinformant_count"),
+        }
+
+        for agent_type, count in counts.items():
+            if agent_type in agent_class_map:
+                agent_class, group, count_attr = agent_class_map[agent_type]
+                for _ in range(count):
+                    agent = agent_class(group, self.all_sprites)
+                    self.collision_group.add(agent)
+                    self.all_sprites.add(agent)
+                    group.add(agent)
+                    # Increment the appropriate count attribute
+                    setattr(self, count_attr, getattr(self, count_attr) + 1)
 
     def draw_zones(self):
         # Draw zone backgrounds
@@ -351,7 +342,26 @@ class Game:
         running = True
 
         while running:
+        # Update all entities
+            #self.all_sprites.update(zones=self.zones)
+            
+            # Check and resolve collisions
+            collisions = pygame.sprite.groupcollide(
+                self.collision_group, 
+                self.collision_group, 
+                False, 
+                False,
+                collided=pygame.sprite.collide_rect_ratio(0.8)  # 80% overlap threshold
+            )
+            
+            for sprite, collided_list in collisions.items():
+                for other in collided_list:
+                    if sprite != other:
+                        sprite.handle_collision(other)
+                        other.handle_collision(sprite)
+
             self.game_clock.update()
+
             # Log every 10 minutes
             current_minute = self.game_clock.get_minute()
             if current_minute % 10 == 0 and current_minute != self.last_log_time:
@@ -365,7 +375,8 @@ class Game:
                     running = False
             
             # Update agents except during deep sleep (00:00-06:00)
-            if not (0 <= current_hour < 6):
+            #if not (0 <= current_hour < 6):
+            if True:
                 self.all_sprites.update()
                 #self.all_sprites.update(zones=self.zones)
 
@@ -374,103 +385,86 @@ class Game:
                 
                 self.update_agent_locations()   
 
-                # Only process interactions after 7:00 or during wake-up time (6:45-7:00)
-                #if current_hour >= 7 or (current_hour == 6 and current_minute >= 30):
-                
                 # Susceptible + Believer -> Exposed
-                collisions = pygame.sprite.groupcollide(
-                    self.susceptible_group, 
-                    self.believer_group, 
-                    False, 
-                    False,
-                    collided=pygame.sprite.collide_rect_ratio(0.7)  # Only collide when 70% overlapping
-                )
-                for sus, believers in collisions.items():
-                    for bel in believers:
-                        prob = 0.1 * bel.influence * (1 + sus.emotional_valence)
-                        if random.random() < prob:
-                            # Create new exposed agent
-                            new_exp = Exposed(self.exposed_group, self.all_sprites)
-                            new_exp.rect.center = sus.rect.center
-                            new_exp.emotional_valence = sus.emotional_valence
+                # In your Game.run() method, modify the collision sections like this:
+
+                # Susceptible + Believer -> Exposed
+                for susceptible in list(self.susceptible_group):  # Use list() to avoid modification during iteration
+                    for believer in list(self.believer_group):
+                        if pygame.sprite.collide_rect(susceptible, believer):
+                            print("CONVERTING SUSCEPTIBLE TO EXPOSED")  # Debug print
                             
-                            # Remove susceptible
-                            sus.kill()
+                            # Create new exposed agent
+                            new_exposed = Exposed(self.exposed_group, self.all_sprites)
+                            new_exposed.rect.center = susceptible.rect.center
+                            new_exposed.emotional_valence = susceptible.emotional_valence
+                            new_exposed.skepticism = susceptible.skepticism
+                            
+                            # Remove old agent from ALL groups
+                            susceptible.kill()
                             self.susceptible_count -= 1
                             
-                            # Add new exposed
-                            self.all_sprites.add(new_exp)
-                            self.exposed_group.add(new_exp)
+                            # Add to groups
+                            self.all_sprites.add(new_exposed)
+                            self.exposed_group.add(new_exposed)
                             self.exposed_count += 1
                             
-                            # Slightly move the believer to prevent immediate re-collision
-                            bel.rect.x += random.choice([-5, 5])
-                            bel.rect.y += random.choice([-5, 5])
+                            # Separate agents
+                            believer.rect.x += random.choice([-5, 5])
+                            believer.rect.y += random.choice([-5, 5])
+                            break
 
-                # Exposed -> Believer or Doubter after exposure time
-                for exp in self.exposed_group:
-                    if exp.exposure_time > 180:
-                        prob = (0.7 - 0.4 * exp.skepticism) * (1 + exp.emotional_valence)
-                        if random.random() < prob:
-                            exp.kill()
-                            self.exposed_count -= 1
-                            new_bel = Believer(self.believer_group, self.all_sprites)
-                            new_bel.rect.center = exp.rect.center
-                            new_bel.emotional_valence = exp.emotional_valence
-                            self.all_sprites.add(new_bel)
-                            self.believer_group.add(new_bel)
-                            self.believer_count += 1
-                            self.total_misinformed = self.believer_count + self.disinformant_count
-                        else:
-                            exp.kill()
-                            self.exposed_count -= 1
-                            new_doub = Doubter(self.doubter_group, self.all_sprites)
-                            new_doub.rect.center = exp.rect.center
-                            new_doub.emotional_valence = exp.emotional_valence
-                            self.all_sprites.add(new_doub)
-                            self.doubter_group.add(new_doub)
-                            self.doubter_count += 1
-                
-                # Doubter + Believer -> Recovered
-                collisions = pygame.sprite.groupcollide(
-                    self.doubter_group,
-                    self.believer_group,
-                    False,
-                    False,
-                    collided=pygame.sprite.collide_rect_ratio(0.7)
-                )
-                for doub, believers in collisions.items():
-                    for bel in believers:
-                        if random.random() < 0.1 * doub.persuasiveness:
+                # Doubter + Believer -> Recovered (100% chance)
+                for doubter in self.doubter_group:
+                    for believer in self.believer_group:
+                        if pygame.sprite.collide_rect(doubter, believer):
                             # Create new recovered agent
-                            new_rec = Recovered(self.recovered_group, self.all_sprites)
-                            new_rec.rect.center = bel.rect.center
+                            new_recovered = Recovered(self.recovered_group, self.all_sprites)
+                            new_recovered.rect.center = believer.rect.center
                             
                             # Remove believer
-                            bel.kill()
+                            believer.kill()
                             self.believer_count -= 1
                             
                             # Add new recovered
-                            self.all_sprites.add(new_rec)
-                            self.recovered_group.add(new_rec)
+                            self.all_sprites.add(new_recovered)
+                            self.recovered_group.add(new_recovered)
                             self.recovered_count += 1
                             
-                            # Slightly move the doubter
-                            doub.rect.x += random.choice([-5, 5])
-                            doub.rect.y += random.choice([-5, 5])
+                            # Slightly move doubter
+                            doubter.rect.x += random.choice([-5, 5])
+                            doubter.rect.y += random.choice([-5, 5])
+                            break  # Only convert once per frame
 
-            characters = (self.susceptible_count + self.exposed_count +
-                        self.believer_count + self.doubter_count + self.recovered_count)
-            self.point_count = self.doubter_count * 2 + self.recovered_count * 3 - self.believer_count
-            self.total_misinformed = self.believer_count + self.disinformant_count
+                # Exposed -> Believer or Doubter after exposure time (100% chance)
+                # For Exposed -> Believer conversion:
+                for exposed in list(self.exposed_group):
+                    exposed.exposure_time += 1
+                    print(f"Exposed agent timer: {exposed.exposure_time}")  # Debug
+                    
+                    if exposed.exposure_time > 10:  # Reduced from 180 for testing
+                        print("CONVERTING EXPOSED TO BELIEVER")
+                        new_believer = Believer(self.believer_group, self.all_sprites)
+                        new_believer.rect.center = exposed.rect.center
+                        new_believer.emotional_valence = exposed.emotional_valence
+                        
+                        exposed.kill()
+                        self.exposed_count -= 1
+                        
+                        self.all_sprites.add(new_believer)
+                        self.believer_group.add(new_believer)
+                        self.believer_count += 1
 
             # --- Drawing ---
+            for sprite in self.all_sprites:
+                pygame.draw.rect(self.screen, (255,0,0), sprite.rect, 1)
             self.screen.fill((255, 255, 255))
             self.draw_zones()
             self.game_clock.draw(self.screen)
             
             # Show agents at all times except midnight-6am
-            if not (0 <= current_hour < 6):
+            #if not (0 <= current_hour < 6):
+            if True:
                 # 06:00-06:45 - Show sleeping agents
                 if 6 <= current_hour < 7 and current_minute < 30:
                     for agent in self.all_sprites:
