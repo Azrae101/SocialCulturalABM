@@ -92,10 +92,11 @@ class Susceptible(pygame.sprite.Sprite):
                 break
 
     def handle_collision(self, other):
-        # Reverse direction with random perturbation
-        self.direction_vector = self.direction_vector.reflect(
-            pygame.math.Vector2(random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5))
-        ).normalize()
+        # Generate a random vector
+        normal = pygame.math.Vector2(random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5))
+        if normal.length() == 0:
+            normal = pygame.math.Vector2(1, 0)  # Default to x-axis if zero
+        self.direction_vector = self.direction_vector.reflect(normal).normalize()
         self.update_direction_facing()
     
     def handle_movement(self):

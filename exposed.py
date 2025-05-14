@@ -14,6 +14,7 @@ class Exposed(pygame.sprite.Sprite):
     def __init__(self, group, all_sprites):
         super().__init__()
         self.all_sprites = all_sprites 
+        self.emotional_valence = random.uniform(0, 1)  # Add this with other properties
         
         def tint_surface(surface, color):
             """Apply color tint to a surface while preserving transparency"""
@@ -93,10 +94,12 @@ class Exposed(pygame.sprite.Sprite):
                 break
 
     def handle_collision(self, other):
-        # Reverse direction with random perturbation
-        self.direction_vector = self.direction_vector.reflect(
-            pygame.math.Vector2(random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5))
-        ).normalize()
+        # Generate a random vector
+        normal = pygame.math.Vector2(random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5))
+        if normal.length() == 0:
+            normal = pygame.math.Vector2(1, 0)  # Default to x-axis if zero
+        self.direction_vector = self.direction_vector.reflect(normal).normalize()
+        self.update_direction_facing()
     
     def update(self):
         self.handle_movement()

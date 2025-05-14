@@ -221,22 +221,49 @@ class Game:
         pygame.draw.rect(self.screen, (0, 0, 0), self.zones["social"], 2)
     
     def enforce_zone_boundaries(self, agent):
-        """Keep agent within their current zone boundaries"""
+        """Keep agent within their current zone boundaries and help them escape corners"""
         current_zone = None
-        
+
         # Determine which zone the agent is in
         for zone_name, zone_rect in self.zones.items():
             if zone_rect.collidepoint(agent.rect.center):
                 current_zone = zone_rect
                 break
-        
+
         if current_zone:
-            # Keep agent within zone boundaries with some padding
             padding = 10  # Small buffer from edges
+            # Store old position for comparison
+            old_left, old_top = agent.rect.left, agent.rect.top
+            old_right, old_bottom = agent.rect.right, agent.rect.bottom
+
+            # Clamp position
             agent.rect.left = max(agent.rect.left, current_zone.left + padding)
             agent.rect.right = min(agent.rect.right, current_zone.right - padding)
             agent.rect.top = max(agent.rect.top, current_zone.top + padding)
             agent.rect.bottom = min(agent.rect.bottom, current_zone.bottom - padding)
+
+            # If agent was clamped (i.e., touching a wall), randomize direction away from wall
+            stuck = (
+                agent.rect.left == current_zone.left + padding or
+                agent.rect.right == current_zone.right - padding or
+                agent.rect.top == current_zone.top + padding or
+                agent.rect.bottom == current_zone.bottom - padding
+            )
+            if stuck:
+                # Pick a direction away from the wall/corner
+                dx = random.choice([-1, 1])
+                dy = random.choice([-1, 1])
+                # If at left or right wall, force x direction away
+                if agent.rect.left == current_zone.left + padding:
+                    dx = 1
+                elif agent.rect.right == current_zone.right - padding:
+                    dx = -1
+                # If at top or bottom wall, force y direction away
+                if agent.rect.top == current_zone.top + padding:
+                    dy = 1
+                elif agent.rect.bottom == current_zone.bottom - padding:
+                    dy = -1
+                agent.direction_vector = pygame.math.Vector2(dx, dy).normalize()
 
     def update_agent_locations(self):
         current_hour = self.game_clock.get_hour()
@@ -385,75 +412,110 @@ class Game:
                 
                 self.update_agent_locations()   
 
-                # Susceptible + Believer -> Exposed
-                # In your Game.run() method, modify the collision sections like this:
-
-                # Susceptible + Believer -> Exposed
-                for susceptible in list(self.susceptible_group):  # Use list() to avoid modification during iteration
-                    for believer in list(self.believer_group):
-                        if pygame.sprite.collide_rect(susceptible, believer):
-                            print("CONVERTING SUSCEPTIBLE TO EXPOSED")  # Debug print
-                            
-                            # Create new exposed agent
+                # SUSCEPTIBLE + DISINFORMANT -> EXPOSED
+                for susceptible in list(self.susceptible_group):
+                    for disinformant in list(self.disinformant_group):
+                        if pygame.sprite.collide_rect(susceptible, disinformant):
+                            print("CONVERTING SUSCEPTIBLE TO EXPOSED (Disinformant)")
                             new_exposed = Exposed(self.exposed_group, self.all_sprites)
                             new_exposed.rect.center = susceptible.rect.center
                             new_exposed.emotional_valence = susceptible.emotional_valence
                             new_exposed.skepticism = susceptible.skepticism
-                            
-                            # Remove old agent from ALL groups
                             susceptible.kill()
                             self.susceptible_count -= 1
-                            
-                            # Add to groups
                             self.all_sprites.add(new_exposed)
                             self.exposed_group.add(new_exposed)
                             self.exposed_count += 1
-                            
-                            # Separate agents
+                            disinformant.rect.x += random.choice([-5, 5])
+                            disinformant.rect.y += random.choice([-5, 5])
+                            break
+
+                # SUSCEPTIBLE + BELIEVER -> EXPOSED
+                for susceptible in list(self.susceptible_group):
+                    for believer in list(self.believer_group):
+                        if pygame.sprite.collide_rect(susceptible, believer):
+                            print("CONVERTING SUSCEPTIBLE TO EXPOSED (Believer)")
+                            new_exposed = Exposed(self.exposed_group, self.all_sprites)
+                            new_exposed.rect.center = susceptible.rect.center
+                            new_exposed.emotional_valence = susceptible.emotional_valence
+                            new_exposed.skepticism = susceptible.skepticism
+                            susceptible.kill()
+                            self.susceptible_count -= 1
+                            self.all_sprites.add(new_exposed)
+                            self.exposed_group.add(new_exposed)
+                            self.exposed_count += 1
                             believer.rect.x += random.choice([-5, 5])
                             believer.rect.y += random.choice([-5, 5])
                             break
+                
+                # EXPOSED + BELIEVER -> BELIEVER (exposed becomes believer faster)
+                for exposed in list(self.exposed_group):
+                    for believer in list(self.believer_group):
+                        if pygame.sprite.collide_rect(exposed, believer):
+                            print("CONVERTING EXPOSED TO BELIEVER (Believer contact)")
+                            new_believer = Believer(self.believer_group, self.all_sprites)
+                            new_believer.rect.center = exposed.rect.center
+                            new_believer.emotional_valence = exposed.emotional_valence
+                            exposed.kill()
+                            self.exposed_count -= 1
+                            self.all_sprites.add(new_believer)
+                            self.believer_group.add(new_believer)
+                            self.believer_count += 1
+                            believer.rect.x += random.choice([-5, 5])
+                            believer.rect.y += random.choice([-5, 5])
+                            break
+                
+                # EXPOSED + DOUBTER -> DOUBTER (exposed becomes doubter)
+                for exposed in list(self.exposed_group):
+                    for doubter in list(self.doubter_group):
+                        if pygame.sprite.collide_rect(exposed, doubter):
+                            print("CONVERTING EXPOSED TO DOUBTER (Doubter contact)")
+                            new_doubter = Doubter(self.doubter_group, self.all_sprites)
+                            new_doubter.rect.center = exposed.rect.center
+                            new_doubter.emotional_valence = exposed.emotional_valence
+                            exposed.kill()
+                            self.exposed_count -= 1
+                            self.all_sprites.add(new_doubter)
+                            self.doubter_group.add(new_doubter)
+                            self.doubter_count += 1
+                            doubter.rect.x += random.choice([-5, 5])
+                            doubter.rect.y += random.choice([-5, 5])
+                            break
 
-                # Doubter + Believer -> Recovered (100% chance)
-                for doubter in self.doubter_group:
-                    for believer in self.believer_group:
+                # BELIEVER + DOUBTER -> RECOVERED (believer becomes recovered)
+                for doubter in list(self.doubter_group):
+                    for believer in list(self.believer_group):
                         if pygame.sprite.collide_rect(doubter, believer):
-                            # Create new recovered agent
+                            print("CONVERTING BELIEVER TO RECOVERED (Doubter contact)")
                             new_recovered = Recovered(self.recovered_group, self.all_sprites)
                             new_recovered.rect.center = believer.rect.center
-                            
-                            # Remove believer
                             believer.kill()
                             self.believer_count -= 1
-                            
-                            # Add new recovered
                             self.all_sprites.add(new_recovered)
                             self.recovered_group.add(new_recovered)
                             self.recovered_count += 1
-                            
-                            # Slightly move doubter
                             doubter.rect.x += random.choice([-5, 5])
                             doubter.rect.y += random.choice([-5, 5])
-                            break  # Only convert once per frame
-
-                # Exposed -> Believer or Doubter after exposure time (100% chance)
-                # For Exposed -> Believer conversion:
-                for exposed in list(self.exposed_group):
-                    exposed.exposure_time += 1
-                    print(f"Exposed agent timer: {exposed.exposure_time}")  # Debug
-                    
-                    if exposed.exposure_time > 10:  # Reduced from 180 for testing
-                        print("CONVERTING EXPOSED TO BELIEVER")
-                        new_believer = Believer(self.believer_group, self.all_sprites)
-                        new_believer.rect.center = exposed.rect.center
-                        new_believer.emotional_valence = exposed.emotional_valence
-                        
-                        exposed.kill()
-                        self.exposed_count -= 1
-                        
-                        self.all_sprites.add(new_believer)
-                        self.believer_group.add(new_believer)
-                        self.believer_count += 1
+                            break
+                
+                # DOUBTER + DISINFORMANT -> BELIEVER (doubter gets convinced)
+                for doubter in list(self.doubter_group):
+                    for disinformant in list(self.disinformant_group):
+                        if pygame.sprite.collide_rect(doubter, disinformant):
+                            print("CONVERTING DOUBTER TO BELIEVER (Disinformant contact)")
+                            new_believer = Believer(self.believer_group, self.all_sprites)
+                            new_believer.rect.center = doubter.rect.center
+                            new_believer.emotional_valence = doubter.emotional_valence
+                            doubter.kill()
+                            self.doubter_count -= 1
+                            self.all_sprites.add(new_believer)
+                            self.believer_group.add(new_believer)
+                            self.believer_count += 1
+                            disinformant.rect.x += random.choice([-5, 5])
+                            disinformant.rect.y += random.choice([-5, 5])
+                            break
+            
+            self.total_misinformed = self.believer_count
 
             # --- Drawing ---
             for sprite in self.all_sprites:
