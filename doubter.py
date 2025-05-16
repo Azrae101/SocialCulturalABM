@@ -91,9 +91,13 @@ class Doubter(pygame.sprite.Sprite):
                 break
 
     def handle_collision(self, other):
-        normal = pygame.math.Vector2(random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5))
-        if normal.length() < 1e-6:  # Use a small threshold instead of == 0
-            normal = pygame.math.Vector2(1, 0)
+        # Defensive: avoid zero-length normal or direction_vector
+        normal = pygame.math.Vector2(self.rect.centerx - other.rect.centerx, self.rect.centery - other.rect.centery)
+        if normal.length_squared() == 0:
+            # Assign a random normal if overlap is perfect
+            normal = pygame.math.Vector2(random.choice([-1, 1]), random.choice([-1, 1]))
+        if self.direction_vector.length_squared() == 0:
+            self.direction_vector = pygame.math.Vector2(random.choice([-1, 1]), random.choice([-1, 1])).normalize()
         self.direction_vector = self.direction_vector.reflect(normal).normalize()
         self.update_direction_facing()
     
