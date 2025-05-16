@@ -15,6 +15,7 @@ class Doubter(pygame.sprite.Sprite):
         super().__init__()
         self.all_sprites = all_sprites 
         self.emotional_valence = random.uniform(0, 1)  # Add this with other properties
+        self.in_social = False  # <-- Add this line
 
         def tint_surface(surface, color):
             """Apply color tint to a surface while preserving transparency"""
@@ -90,10 +91,9 @@ class Doubter(pygame.sprite.Sprite):
                 break
 
     def handle_collision(self, other):
-        # Generate a random vector
         normal = pygame.math.Vector2(random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5))
-        if normal.length() < 1e-6:
-            normal = pygame.math.Vector2(1, 0)  # Default to x-axis if near zero
+        if normal.length() < 1e-6:  # Use a small threshold instead of == 0
+            normal = pygame.math.Vector2(1, 0)
         self.direction_vector = self.direction_vector.reflect(normal).normalize()
         self.update_direction_facing()
     

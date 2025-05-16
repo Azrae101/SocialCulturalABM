@@ -63,15 +63,14 @@ AGENT_TYPES = [
 
 OTHER_FACTORS = [
     ("Emotional Valence", (250, 10, 10)),
-    #("Social Influence", (10, 10, 250)),
 ]
 
 class Clock:
     def __init__(self, x, y):
         self.font = pygame.font.SysFont('Consolas', 32)
         self.position = (x, y)
-        self.simulation_time = datetime(2023, 1, 1, 6, 30)  # Start at 6
-        self.time_multiplier = 6  # 6 game minutes per real second (10 sec/hour)
+        self.simulation_time = datetime(2023, 1, 1, 6, 0)
+        self.time_multiplier = 10  # 1 hour per real second (10 sec/hour)
         self.last_update = pygame.time.get_ticks()
     
     def update(self):
@@ -182,6 +181,124 @@ class Game:
         self.point_count = 0
         self.spawn = pygame.Rect(self.screen_width - 1140, self.screen_height - 800, 920, 605)
 
+        self.home_grid_rows = 5
+        self.home_grid_cols = 6
+        self.home_grid_cells = self.home_grid_rows * self.home_grid_cols
+        self.home_grid_assignments = {}  # agent -> (row, col)
+        self.home_grid_agents = {}  # (row, col) -> [agents]
+
+    def get_home_grid_rects(self):
+        """Return a dict of (row, col): pygame.Rect for each grid cell in home zone."""
+        zone = self.zones["home"]
+        padding_top = 40  # Space for the title above the grid
+        grid_top = zone.top + padding_top
+        grid_height = zone.height - padding_top
+        cell_w = zone.width // self.home_grid_cols
+        cell_h = grid_height // self.home_grid_rows
+        grid_rects = {}
+        for row in range(self.home_grid_rows):
+            for col in range(self.home_grid_cols):
+                left = zone.left + col * cell_w
+                top = grid_top + row * cell_h
+                grid_rects[(row, col)] = pygame.Rect(left, top, cell_w, cell_h)
+        return grid_rects
+
+    def assign_agents_to_home_grid(self):
+        """Assign agents to grid cells only if they don't already have an assignment."""
+        agents = [a for a in self.all_sprites if self.zones["home"].collidepoint(a.rect.center) and (not hasattr(a, "home_grid_cell") or a.home_grid_cell is None)]
+        if not agents:
+            return  # No new agents to assign
+
+        random.shuffle(agents)
+        grid_cells = [(r, c) for r in range(self.home_grid_rows) for c in range(self.home_grid_cols)]
+        # Only consider cells with space (max 3 per cell)
+        cell_agents = self.home_grid_agents if hasattr(self, "home_grid_agents") else {cell: [] for cell in grid_cells}
+
+        # Build a list of available cells (cells with < 3 agents)
+        available_cells = [cell for cell in grid_cells if len(cell_agents.get(cell, [])) < 3]
+        random.shuffle(available_cells)
+
+        agent_idx = 0
+        for cell in available_cells:
+            while len(cell_agents.get(cell, [])) < 3 and agent_idx < len(agents):
+                agent = agents[agent_idx]
+                if cell not in cell_agents:
+                    cell_agents[cell] = []
+                cell_agents[cell].append(agent)
+                agent.home_grid_cell = cell
+                # Move agent to random position within their assigned cell
+                grid_rects = self.get_home_grid_rects()
+                rect = grid_rects[cell]
+                agent.rect.center = (
+                    random.randint(rect.left + 10, rect.right - 10),
+                    random.randint(rect.top + 10, rect.bottom - 10)
+                )
+                agent_idx += 1
+            if agent_idx >= len(agents):
+                break
+
+        self.home_grid_agents = cell_agents
+
+    def clear_home_grid_assignment(self, agent):
+        """Clear agent's grid assignment when leaving home zone."""
+        if hasattr(agent, "home_grid_cell"):
+            cell = agent.home_grid_cell
+            if cell in self.home_grid_agents and agent in self.home_grid_agents[cell]:
+                self.home_grid_agents[cell].remove(agent)
+            agent.home_grid_cell = None
+
+    def enforce_home_grid_boundaries(self, agent):
+        """Keep agent within their assigned grid cell in home zone."""
+        if hasattr(agent, "home_grid_cell"):
+            grid_rects = self.get_home_grid_rects()
+            rect = grid_rects[agent.home_grid_cell]
+            # Clamp agent position to grid cell
+            agent.rect.left = max(agent.rect.left, rect.left + 2)
+            agent.rect.right = min(agent.rect.right, rect.right - 2)
+            agent.rect.top = max(agent.rect.top, rect.top + 2)
+            agent.rect.bottom = min(agent.rect.bottom, rect.bottom - 2)
+
+    def set_next_switch_time(self, agent, current_time, to_social):
+        if to_social:
+            # Social media: 20-30 min
+            minutes = random.randint(20, 30)
+        else:
+            # Home: 5-15 min
+            minutes = random.randint(5, 15)
+        agent.next_switch_time = (current_time.hour * 60 + current_time.minute) + minutes
+
+    def main_menu(self):
+        font = pygame.font.SysFont('Consolas', 44)
+        small_font = pygame.font.SysFont('Consolas', 32)
+        one_day_button = pygame.Rect(self.screen_width//2 - 200, 300, 400, 80)
+        week_button = pygame.Rect(self.screen_width//2 - 200, 420, 400, 80)
+        running = True
+        choice = None
+        while running:
+            self.screen.fill((240, 240, 240))
+            title = font.render("Misinformation Simulation", True, (30, 30, 30))
+            self.screen.blit(title, (self.screen_width//2 - title.get_width()//2, 120))
+            pygame.draw.rect(self.screen, (0, 120, 0), one_day_button)
+            pygame.draw.rect(self.screen, (0, 0, 120), week_button)
+            one_day_text = small_font.render("Run for 1 Day (24h)", True, (255,255,255))
+            week_text = small_font.render("Run for 1 Week", True, (255,255,255))
+            self.screen.blit(one_day_text, (one_day_button.x + 40, one_day_button.y + 20))
+            self.screen.blit(week_text, (week_button.x + 40, week_button.y + 20))
+            pygame.display.flip()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if one_day_button.collidepoint(event.pos):
+                        choice = "day"
+                        running = False
+                    elif week_button.collidepoint(event.pos):
+                        choice = "week"
+                        running = False
+            self.clock.tick(30)
+        return choice
+
     def setup_screen(self):
         font = pygame.font.SysFont('Consolas', 32)
         sliders = []
@@ -189,7 +306,7 @@ class Game:
         for name, color in AGENT_TYPES:
             sliders.append(Slider(200, y, 0, 30, color, name, font))
             y += 80
-        
+
         for name, color in OTHER_FACTORS:
             sliders.append(Slider(200, y, 0, 10, color, name, font))
             y += 80
@@ -199,7 +316,7 @@ class Game:
         running = True
         while running:
             self.screen.fill((240, 240, 240))
-            title = pygame.font.SysFont('Consolas', 44).render("Set Initial Agent Counts", True, (30, 30, 30))
+            title = font.render("Set Initial Agent Counts", True, (30, 30, 30))
             self.screen.blit(title, (self.screen_width//2 - title.get_width()//2, 40))
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -215,11 +332,9 @@ class Game:
             self.screen.blit(start_button_text, (start_button.x + 60, start_button.y + 10))
             pygame.display.flip()
             self.clock.tick(30)
-        # Return chosen counts as a dictionary
         return {slider.label: slider.value for slider in sliders}
 
     def initialize_agents(self, counts):
-        # Map agent type names to their classes and groups
         agent_class_map = {
             "Susceptible": (Susceptible, self.susceptible_group, "susceptible_count"),
             "Exposed": (Exposed, self.exposed_group, "exposed_count"),
@@ -228,16 +343,25 @@ class Game:
             "Recovered": (Recovered, self.recovered_group, "recovered_count"),
             "Disinformant": (Disinformant, self.disinformant_group, "disinformant_count"),
         }
-
+        home_zone = self.zones["home"]
         for agent_type, count in counts.items():
             if agent_type in agent_class_map:
                 agent_class, group, count_attr = agent_class_map[agent_type]
                 for _ in range(count):
                     agent = agent_class(group, self.all_sprites)
+                    # Place agent in home zone at spawn
+                    padding = 10
+                    new_x = random.randint(home_zone.left + padding, home_zone.right + padding)
+                    new_y = random.randint(home_zone.top + padding, home_zone.bottom + padding)
+                    agent.rect.center = (new_x, new_y)
+                    agent.direction_vector = pygame.math.Vector2(
+                        random.choice([-0.5, 0.5]),
+                        random.choice([-0.5, 0.5])
+                    ).normalize()
+                    agent.next_switch_time = 0  # <-- This is correct!
                     self.collision_group.add(agent)
                     self.all_sprites.add(agent)
                     group.add(agent)
-                    # Increment the appropriate count attribute
                     setattr(self, count_attr, getattr(self, count_attr) + 1)
 
     def draw_zones(self):
@@ -252,7 +376,7 @@ class Game:
         work_label = font.render("WORK", True, (0, 0, 0))
         social_label = font.render("SOCIAL MEDIA", True, (0, 0, 0))
         
-        self.screen.blit(home_label, (self.zones["home"].x + 150, self.zones["home"].y + 10))
+        self.screen.blit(home_label, (self.zones["home"].x + 150, self.zones["home"].y + 10)) 
         self.screen.blit(work_label, (self.zones["work"].x + 150, self.zones["work"].y + 10))
         self.screen.blit(social_label, (self.zones["social"].x + 120, self.zones["social"].y + 10))
         
@@ -260,6 +384,11 @@ class Game:
         pygame.draw.rect(self.screen, (0, 0, 0), self.zones["home"], 2)
         pygame.draw.rect(self.screen, (0, 0, 0), self.zones["work"], 2)
         pygame.draw.rect(self.screen, (0, 0, 0), self.zones["social"], 2)
+
+        # Draw grid lines in home zone
+        grid_rects = self.get_home_grid_rects()
+        for rect in grid_rects.values():
+            pygame.draw.rect(self.screen, (180, 180, 180), rect, 1)
     
     def enforce_zone_boundaries(self, agent):
         """Keep agent within their current zone boundaries and help them escape corners"""
@@ -309,54 +438,62 @@ class Game:
     def update_agent_locations(self):
         current_hour = self.game_clock.get_hour()
         current_minute = self.game_clock.get_minute()
-        
-        if 0 <= current_hour < 6:  # Deep sleep
+
+        # Force all agents to home zone during sleep (00:00–07:00)
+        if 0 <= current_hour < 7:
+            zone = self.zones["home"]
+            for agent in self.all_sprites:
+                if not zone.collidepoint(agent.rect.center):
+                    self.move_agent_to_zone(agent, zone)
+                # Assign grid cell if not already assigned
+                if not hasattr(agent, "home_grid_cell") or agent.home_grid_cell is None:
+                    self.assign_agents_to_home_grid()
             return
-            
+
         # Determine target zone based on time
         if 6 <= current_hour < 7:
             target_zone = "home"
         elif 8 <= current_hour < 16:
             target_zone = "work"
         elif (7 <= current_hour < 8) or (19 <= current_hour < 21):  # Social media hours
-            # For each agent, decide if they should be in social or home based on time pattern
+            current_total_minutes = current_hour * 60 + current_minute
             for agent in self.all_sprites:
-                if not hasattr(agent, 'social_media_timer'):
-                    # Initialize timers and random duration if they don't exist
-                    agent.social_media_timer = 0
-                    agent.in_social = True
-                    agent.social_duration = random.randint(20, 30)  # 20-30 mins
-                    agent.home_duration = random.randint(5, 15)  # 2-10 minutes at home
-                    
-                # Update timer based on game time
-                agent.social_media_timer += self.game_clock.time_multiplier / 60  # Convert to game minutes
-                
-                if agent.in_social:
-                    if agent.social_media_timer >= agent.social_duration:  # Use random duration
-                        agent.in_social = False
-                        agent.social_media_timer = 0
-                else:
-                    if agent.social_media_timer >= agent.home_duration:  # 10 minutes in home
-                        agent.in_social = True
-                        agent.social_media_timer = 0
-                        agent.social_duration = random.randint(20, 30)  # Get new random duration for next session
-                
-                # Set zone based on current state
+                # If agent doesn't have a next_switch_time, set it based on current state
+                if not hasattr(agent, "next_switch_time") or agent.next_switch_time == 0:
+                    if not agent.in_social:
+                        self.set_next_switch_time(agent, self.game_clock.simulation_time, to_social=True)
+                    else:
+                        self.set_next_switch_time(agent, self.game_clock.simulation_time, to_social=False)
+
+                # Time to switch?
+                if current_total_minutes >= agent.next_switch_time:
+                    agent.in_social = not agent.in_social
+                    self.set_next_switch_time(agent, self.game_clock.simulation_time, to_social=agent.in_social)
+
                 target_zone = "social" if agent.in_social else "home"
                 zone = self.zones[target_zone]
-                
-                # Move agent if not already in correct zone
                 if not zone.collidepoint(agent.rect.center):
                     self.move_agent_to_zone(agent, zone)
+                    if target_zone != "home":
+                        self.clear_home_grid_assignment(agent)
+                # --- Only assign grid cell if agent is in home and has no assignment ---
+                if target_zone == "home" and (not hasattr(agent, "home_grid_cell") or agent.home_grid_cell is None):
+                    self.assign_agents_to_home_grid()
         else:
             target_zone = "home"
-        
+
         # For non-social-media hours or agents not in social-media pattern
         if not ((7 <= current_hour < 8) or (19 <= current_hour < 21)):
             zone = self.zones[target_zone]
             for agent in self.all_sprites:
                 if not zone.collidepoint(agent.rect.center):
                     self.move_agent_to_zone(agent, zone)
+                    # If leaving home, clear grid assignment
+                    if target_zone != "home":
+                        self.clear_home_grid_assignment(agent)
+                # --- Only assign grid cell if agent is in home and has no assignment ---
+                if target_zone == "home" and (not hasattr(agent, "home_grid_cell") or agent.home_grid_cell is None):
+                    self.assign_agents_to_home_grid()
 
     def move_agent_to_zone(self, agent, zone):
         padding = 10  # Same padding as enforce_zone_boundaries
@@ -403,205 +540,209 @@ class Game:
         self.log_file.flush()  # Ensure data is written to disk
 
     def run(self):
+        # --- Main menu for simulation duration ---
+        sim_choice = self.main_menu()
+        if sim_choice == "day":
+            sim_days = 1
+        else:
+            sim_days = 7
+
+        # Setup and start simulation as before
         characters = 0
         counts = self.setup_screen()
         self.initialize_agents(counts)
         self.setup_logging()  # Initialize logging system
-        running = True
 
+        # Set simulation start and end time
+        sim_start_time = datetime(2023, 1, 1, 6, 0)
+        sim_end_time = sim_start_time + timedelta(days=sim_days)
+
+        # --- Ensure clock is reset to 6:00 every run ---
+        self.game_clock.simulation_time = sim_start_time
+        self.game_clock.last_update = pygame.time.get_ticks()
+
+        running = True
         while running:
-        # Update all entities
-            #self.all_sprites.update(zones=self.zones)
-            
-            # Check and resolve collisions
-            collisions = pygame.sprite.groupcollide(
-                self.collision_group, 
-                self.collision_group, 
-                False, 
-                False,
-                collided=pygame.sprite.collide_rect_ratio(0.8)  # 80% overlap threshold
-            )
-            
-            for sprite, collided_list in collisions.items():
-                for other in collided_list:
-                    if sprite != other:
-                        sprite.handle_collision(other)
-                        other.handle_collision(sprite)
+            current_hour = self.game_clock.get_hour()
+            current_minute = self.game_clock.get_minute()
+
+            # --- SLEEP HOURS: 00:00-06:00 ---
+            if 0 <= current_hour < 6:
+                # Agents do not move or update, just draw them grayed out and clamped to home zone
+                home_zone = self.zones["home"]
+                padding = 10
+                for agent in self.all_sprites:
+                    # Clamp agent position to be fully inside home zone
+                    agent.rect.left = max(agent.rect.left, home_zone.left + padding)
+                    agent.rect.right = min(agent.rect.right, home_zone.right + padding)
+                    agent.rect.top = max(agent.rect.top, home_zone.top + padding)
+                    agent.rect.bottom = min(agent.rect.bottom, home_zone.bottom + padding)
+                # Draw everything (see your drawing code below)
+                self.screen.fill((255, 255, 255))
+                self.draw_zones()
+                self.game_clock.draw(self.screen)
+                for agent in self.all_sprites:
+                    sleeping_img = pygame.Surface((agent.rect.width, agent.rect.height))
+                    sleeping_img.fill((200, 200, 200))  # Light gray
+                    sleeping_img.set_alpha(200)
+                    self.screen.blit(sleeping_img, agent.rect)
+                # ...draw stats etc...
+                pygame.display.flip()
+                self.clock.tick(self.fps)
+                self.game_clock.update()
+                # Logging and quit checks
+                if self.game_clock.simulation_time >= sim_end_time:
+                    print("Simulation complete.")
+                    self.log_current_state(self.game_clock.simulation_time)
+                    running = False
+                continue
+
+            # --- HOME ZONE (not sleep): 06:00-08:00, 16:00-24:00, and when not in social/work ---
+            # Determine if agent is in home zone and not sleeping
+            # Social media hours: 07:00-08:00 and 19:00-21:00
+            in_social_media_hours = (7 <= current_hour < 8) or (19 <= current_hour < 21)
+            in_work_hours = (8 <= current_hour < 16)
+            # If not in work or social, agents are in home
+            if not in_work_hours and not in_social_media_hours:
+                # Agents are in home grid and can move, but only within their grid cell
+                self.update_agent_locations()  # This will assign agents to home grid if needed
+
+                # Only check collisions within each grid cell
+                for cell, agents in self.home_grid_agents.items():
+                    for i, agent in enumerate(agents):
+                        for other in agents[i+1:]:
+                            # --- Restrict Recovered interaction to home zone only ---
+                            if (
+                                agent.__class__.__name__ == "Recovered"
+                                or other.__class__.__name__ == "Recovered"
+                            ):
+                                # Both are in home, so allow interaction
+                                pass
+                            if pygame.sprite.collide_rect(agent, other):
+                                agent.handle_collision(other)
+                                other.handle_collision(agent)
+                # Update and restrict agents to their grid cell
+                self.all_sprites.update()
+                for agent in self.all_sprites:
+                    self.enforce_home_grid_boundaries(agent)
+            elif in_work_hours:
+                # --- WORK ZONE DYNAMICS: Move slower except during break periods ---
+                # Agents move at normal speed during first 10 minutes of each hour,
+                # very fast from 12:00-12:30, otherwise move at reduced speed
+                fast_period = False
+                very_fast_period = False
+                if current_minute < 10:
+                    fast_period = True
+                if current_hour == 12 and 0 <= current_minute < 30:
+                    very_fast_period = True
+
+                collisions = pygame.sprite.groupcollide(
+                    self.collision_group, 
+                    self.collision_group, 
+                    False, 
+                    False,
+                    collided=pygame.sprite.collide_rect_ratio(0.8)
+                )
+                for sprite, collided_list in collisions.items():
+                    for other in collided_list:
+                        if sprite != other:
+                            # --- Prevent Recovered from interacting outside home ---
+                            if (
+                                sprite.__class__.__name__ == "Recovered"
+                                or other.__class__.__name__ == "Recovered"
+                            ):
+                                home_zone = self.zones["home"]
+                                if not (home_zone.collidepoint(sprite.rect.center) and home_zone.collidepoint(other.rect.center)):
+                                    continue
+                            # --- Defensive: skip collision if direction_vector is zero for either agent ---
+                            if (
+                                hasattr(sprite, "direction_vector") and
+                                hasattr(other, "direction_vector") and
+                                (sprite.direction_vector.length_squared() == 0 or other.direction_vector.length_squared() == 0)
+                            ):
+                                # Assign a random direction to avoid zero-length vector
+                                if sprite.direction_vector.length_squared() == 0:
+                                    sprite.direction_vector = pygame.math.Vector2(random.choice([-1, 1]), random.choice([-1, 1])).normalize()
+                                if other.direction_vector.length_squared() == 0:
+                                    other.direction_vector = pygame.math.Vector2(random.choice([-1, 1]), random.choice([-1, 1])).normalize()
+                            sprite.handle_collision(other)
+                            other.handle_collision(sprite)
+                # Adjust agent speed
+                for agent in self.all_sprites:
+                    if self.zones["work"].collidepoint(agent.rect.center):
+                        if very_fast_period:
+                            agent.speed = getattr(agent, "base_speed", 2.0) * 2.5  # Very fast at lunch break
+                        elif fast_period:
+                            agent.speed = getattr(agent, "base_speed", 2.0)
+                        else:
+                            agent.speed = getattr(agent, "base_speed", 2.0) * 0.3
+                self.all_sprites.update()
+                # Always enforce boundaries and update locations
+                for agent in self.all_sprites:
+                    self.enforce_zone_boundaries(agent)
+                self.update_agent_locations()
+            else:
+                # --- SOCIAL MEDIA HOURS ---
+                # Normal collision and boundary logic
+                collisions = pygame.sprite.groupcollide(
+                    self.collision_group, 
+                    self.collision_group, 
+                    False, 
+                    False,
+                    collided=pygame.sprite.collide_rect_ratio(0.8)
+                )
+                for sprite, collided_list in collisions.items():
+                    for other in collided_list:
+                        if sprite != other:
+                            # --- Prevent Recovered from interacting outside home ---
+                            if (
+                                sprite.__class__.__name__ == "Recovered"
+                                or other.__class__.__name__ == "Recovered"
+                            ):
+                                home_zone = self.zones["home"]
+                                if not (home_zone.collidepoint(sprite.rect.center) and home_zone.collidepoint(other.rect.center)):
+                                    continue  # Skip interaction if not both in home
+                            sprite.handle_collision(other)
+                            other.handle_collision(sprite)
+                self.all_sprites.update()
+                for agent in self.all_sprites:
+                    self.enforce_zone_boundaries(agent)
+                self.update_agent_locations()
+
+            # --- Believer forgetting logic ---
+            for agent in list(self.believer_group):
+                # 0.1% chance per frame to forget and become susceptible
+                if random.random() < 0.001:
+                    # Remove from believer group, add to susceptible
+                    self.believer_group.remove(agent)
+                    self.susceptible_group.add(agent)
+                    agent.__class__ = Susceptible
+                    self.believer_count -= 1
+                    self.susceptible_count += 1
 
             self.game_clock.update()
+
+            # --- Stop simulation if time is up ---
+            if self.game_clock.simulation_time >= sim_end_time:
+                print("Simulation complete.")
+                self.log_current_state(self.game_clock.simulation_time)
+                running = False
+                continue
 
             # Log every 10 minutes
             current_minute = self.game_clock.get_minute()
             if current_minute % 10 == 0 and current_minute != self.last_log_time:
                 self.log_current_state(self.game_clock.simulation_time)
                 self.last_log_time = current_minute
-            current_hour = self.game_clock.get_hour()
-            current_minute = self.game_clock.get_minute()
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-            
-            # Update agents except during deep sleep (00:00-06:00)
-            if not (0 <= current_hour < 6):
-                self.all_sprites.update()
-                #self.all_sprites.update(zones=self.zones)
 
-                for agent in self.all_sprites:
-                    self.enforce_zone_boundaries(agent)
-                
-                self.update_agent_locations()   
-
-                # SUSCEPTIBLE + DISINFORMANT -> EXPOSED
-                for susceptible in list(self.susceptible_group):
-                    for disinformant in list(self.disinformant_group):
-                        if pygame.sprite.collide_rect(susceptible, disinformant):
-                            prob = change_probability(
-                                susceptible,
-                                influencer=disinformant,
-                                environment_factor=1.2 if self.zones["social"].collidepoint(susceptible.rect.center) else 1.0,
-                                misinformant_exposure=1  # or track actual exposures if you wish
-                            )
-                            if np.random.rand() < prob:
-                                print("CONVERTING SUSCEPTIBLE TO EXPOSED (Disinformant)")
-                                new_exposed = Exposed(self.exposed_group, self.all_sprites)
-                                new_exposed.rect.center = susceptible.rect.center
-                                new_exposed.emotional_valence = susceptible.emotional_valence
-                                new_exposed.skepticism = susceptible.skepticism
-                                susceptible.kill()
-                                self.susceptible_count -= 1
-                                self.all_sprites.add(new_exposed)
-                                self.exposed_group.add(new_exposed)
-                                self.exposed_count += 1
-                                disinformant.rect.x += random.choice([-5, 5])
-                                disinformant.rect.y += random.choice([-5, 5])
-                            break
-
-                # SUSCEPTIBLE + BELIEVER -> EXPOSED
-                for susceptible in list(self.susceptible_group):
-                    for believer in list(self.believer_group):
-                        if pygame.sprite.collide_rect(susceptible, believer):
-                            prob = change_probability(
-                                susceptible,
-                                influencer=believer,
-                                environment_factor=1.2 if self.zones["social"].collidepoint(susceptible.rect.center) else 1.0
-                            )
-                            if np.random.rand() < prob:
-                                print("CONVERTING SUSCEPTIBLE TO EXPOSED (Believer)")
-                                new_exposed = Exposed(self.exposed_group, self.all_sprites)
-                                new_exposed.rect.center = susceptible.rect.center
-                                new_exposed.emotional_valence = susceptible.emotional_valence
-                                new_exposed.skepticism = susceptible.skepticism
-                                susceptible.kill()
-                                self.susceptible_count -= 1
-                                self.all_sprites.add(new_exposed)
-                                self.exposed_group.add(new_exposed)
-                                self.exposed_count += 1
-                                believer.rect.x += random.choice([-5, 5])
-                                believer.rect.y += random.choice([-5, 5])
-                            break
-
-                # EXPOSED + BELIEVER -> BELIEVER (exposed becomes believer faster)
-                for exposed in list(self.exposed_group):
-                    for believer in list(self.believer_group):
-                        if pygame.sprite.collide_rect(exposed, believer):
-                            prob = change_probability(
-                                exposed,
-                                influencer=believer,
-                                environment_factor=1.2 if self.zones["social"].collidepoint(exposed.rect.center) else 1.0
-                            )
-                            if np.random.rand() < prob:
-                                print("CONVERTING EXPOSED TO BELIEVER (Believer contact)")
-                                new_believer = Believer(self.believer_group, self.all_sprites)
-                                new_believer.rect.center = exposed.rect.center
-                                new_believer.emotional_valence = exposed.emotional_valence
-                                exposed.kill()
-                                self.exposed_count -= 1
-                                self.all_sprites.add(new_believer)
-                                self.believer_group.add(new_believer)
-                                self.believer_count += 1
-                                believer.rect.x += random.choice([-5, 5])
-                                believer.rect.y += random.choice([-5, 5])
-                            break
-
-                # EXPOSED + DOUBTER -> DOUBTER (exposed becomes doubter)
-                for exposed in list(self.exposed_group):
-                    for doubter in list(self.doubter_group):
-                        if pygame.sprite.collide_rect(exposed, doubter):
-                            prob = change_probability(
-                                exposed,
-                                influencer=doubter,
-                                environment_factor=1.2 if self.zones["social"].collidepoint(exposed.rect.center) else 1.0
-                            )
-                            if np.random.rand() < prob:
-                                print("CONVERTING EXPOSED TO DOUBTER (Doubter contact)")
-                                new_doubter = Doubter(self.doubter_group, self.all_sprites)
-                                new_doubter.rect.center = exposed.rect.center
-                                new_doubter.emotional_valence = exposed.emotional_valence
-                                exposed.kill()
-                                self.exposed_count -= 1
-                                self.all_sprites.add(new_doubter)
-                                self.doubter_group.add(new_doubter)
-                                self.doubter_count += 1
-                                doubter.rect.x += random.choice([-5, 5])
-                                doubter.rect.y += random.choice([-5, 5])
-                            break
-
-                # BELIEVER + DOUBTER -> RECOVERED (believer becomes recovered)
-                for doubter in list(self.doubter_group):
-                    for believer in list(self.believer_group):
-                        if pygame.sprite.collide_rect(doubter, believer):
-                            prob = change_probability(
-                                believer,
-                                influencer=doubter,
-                                environment_factor=1.2 if self.zones["social"].collidepoint(believer.rect.center) else 1.0
-                            )
-                            if np.random.rand() < prob:
-                                print("CONVERTING BELIEVER TO RECOVERED (Doubter contact)")
-                                new_recovered = Recovered(self.recovered_group, self.all_sprites)
-                                new_recovered.rect.center = believer.rect.center
-                                believer.kill()
-                                self.believer_count -= 1
-                                self.all_sprites.add(new_recovered)
-                                self.recovered_group.add(new_recovered)
-                                self.recovered_count += 1
-                                doubter.rect.x += random.choice([-5, 5])
-                                doubter.rect.y += random.choice([-5, 5])
-                            break
-
-                # DOUBTER + DISINFORMANT -> BELIEVER (doubter gets convinced)
-                for doubter in list(self.doubter_group):
-                    for disinformant in list(self.disinformant_group):
-                        if pygame.sprite.collide_rect(doubter, disinformant):
-                            prob = change_probability(
-                                doubter,
-                                influencer=disinformant,
-                                environment_factor=1.2 if self.zones["social"].collidepoint(doubter.rect.center) else 1.0,
-                                misinformant_exposure=1
-                            )
-                            if np.random.rand() < prob:
-                                print("CONVERTING DOUBTER TO BELIEVER (Disinformant contact)")
-                                new_believer = Believer(self.believer_group, self.all_sprites)
-                                new_believer.rect.center = doubter.rect.center
-                                new_believer.emotional_valence = doubter.emotional_valence
-                                doubter.kill()
-                                self.doubter_count -= 1
-                                self.all_sprites.add(new_believer)
-                                self.believer_group.add(new_believer)
-                                self.believer_count += 1
-                                disinformant.rect.x += random.choice([-5, 5])
-                                disinformant.rect.y += random.choice([-5, 5])
-                            break
-            
-            self.total_misinformed = self.believer_count + self.exposed_count
-
-            # --- Drawing ---
-            for sprite in self.all_sprites:
-                pygame.draw.rect(self.screen, (255,0,0), sprite.rect, 1)
+            # --- Drawing section ---
             self.screen.fill((255, 255, 255))
             self.draw_zones()
             self.game_clock.draw(self.screen)
-            
             # Show agents at all times except midnight-6am
             #if not (0 <= current_hour < 6):
             if True:
@@ -654,10 +795,10 @@ class Game:
             pygame.display.flip()
             self.clock.tick(self.fps)
 
-            def __del__(self):
-                """Cleanup method to close log file"""
-                if hasattr(self, 'log_file'):
-                    self.log_file.close()
+        def __del__(self):
+            """Cleanup method to close log file"""
+            if hasattr(self, 'log_file'):
+                self.log_file.close()
 
 if __name__ == "__main__":
     game = Game()
