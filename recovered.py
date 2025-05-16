@@ -97,9 +97,11 @@ class Recovered(pygame.sprite.Sprite):
 
     def handle_collision(self, other):
         normal = pygame.math.Vector2(random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5))
-        if normal.length() < 1e-6:  # Use a small threshold instead of == 0
-            normal = pygame.math.Vector2(1, 0)
-        self.direction_vector = self.direction_vector.reflect(normal).normalize()
+        if normal.length_squared() > 0:
+            self.direction_vector = self.direction_vector.reflect(normal).normalize()
+        else:
+            # Use a random direction if normal is zero
+            self.direction_vector = pygame.math.Vector2(random.choice([-1, 1]), random.choice([-1, 1])).normalize()
         self.update_direction_facing()
 
     def update(self, zones=None):

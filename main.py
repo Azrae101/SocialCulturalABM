@@ -16,30 +16,26 @@ from disinformant import Disinformant
 def change_probability(agent, influencer=None, environment_factor=1.0, misinformant_exposure=0):
     """
     Calculate the probability of an agent changing state.
-    - agent: the agent being influenced (must have .emotional_valence, .skepticism, etc.)
-    - influencer: the influencing agent (must have .influence if present)
-    - environment_factor: float, multiplier for environmental context (e.g., higher in social media zone)
-    - misinformant_exposure: int, number of recent exposures to misinformants
-    Returns: probability (float between 0 and 1)
     """
-    # Emotional valence: higher valence = more likely to change (Beta(2, 2) is a reasonable prior)
     valence_prob = beta.cdf(agent.emotional_valence, 2, 2)
-    
-    # Influence: from influencer (if present), otherwise default
     influence = getattr(influencer, 'influence', 1.0) if influencer else 1.0
-    
-    # Skepticism: higher means less likely to change
     skepticism = getattr(agent, 'skepticism', 0.5)
-    skepticism_factor = 1.0 - skepticism  # 0 = never change, 1 = always change
-    
-    # Misinformant exposure: each exposure increases chance by 5% (capped at +25%)
+    skepticism_factor = 1.0 - skepticism
     misinfo_bonus = min(0.05 * misinformant_exposure, 0.25)
-    
-    # Environment: e.g., 1.2 in social media, 1.0 elsewhere
     env = environment_factor
-    
-    # Combine all factors
-    base_prob = 0.2  # Base probability for susceptible/exposed
+
+    # --- Increase base probability for Exposed agents ---
+    if agent.__class__.__name__ == "Exposed":
+        # Strong bias: much higher chance to become Believer than Doubter
+        if influencer and influencer.__class__.__name__ == "Believer":
+            base_prob = 0.8  # High chance to become Believer
+        elif influencer and influencer.__class__.__name__ == "Doubter":
+            base_prob = 0.2  # Much lower chance to become Doubter
+        else:
+            base_prob = 0.6  # Default for Exposed
+    else:
+        base_prob = 0.2  # Base probability for susceptible/doubter
+
     prob = base_prob * influence * valence_prob * skepticism_factor * env
     prob += misinfo_bonus
 
@@ -47,9 +43,8 @@ def change_probability(agent, influencer=None, environment_factor=1.0, misinform
     if agent.__class__.__name__ == "Doubter" and (
         influencer and influencer.__class__.__name__ in ["Believer", "Disinformant"]
     ):
-        prob *= 0.05  # Only 5% of the already small probability
+        prob *= 0.05
 
-    # Clamp between 0 and 1
     return max(0.0, min(1.0, prob))
 
 AGENT_TYPES = [
@@ -70,7 +65,7 @@ class Clock:
         self.font = pygame.font.SysFont('Consolas', 32)
         self.position = (x, y)
         self.simulation_time = datetime(2023, 1, 1, 6, 0)
-        self.time_multiplier = 10  # 1 hour per real second (10 sec/hour)
+        self.time_multiplier = 60  # 1 hour per real second (10 sec/hour)
         self.last_update = pygame.time.get_ticks()
     
     def update(self):
@@ -249,14 +244,16 @@ class Game:
 
     def enforce_home_grid_boundaries(self, agent):
         """Keep agent within their assigned grid cell in home zone."""
-        if hasattr(agent, "home_grid_cell"):
+        if hasattr(agent, "home_grid_cell") and agent.home_grid_cell is not None:
             grid_rects = self.get_home_grid_rects()
-            rect = grid_rects[agent.home_grid_cell]
-            # Clamp agent position to grid cell
-            agent.rect.left = max(agent.rect.left, rect.left + 2)
-            agent.rect.right = min(agent.rect.right, rect.right - 2)
-            agent.rect.top = max(agent.rect.top, rect.top + 2)
-            agent.rect.bottom = min(agent.rect.bottom, rect.bottom - 2)
+            if agent.home_grid_cell in grid_rects:
+                rect = grid_rects[agent.home_grid_cell]
+                # Clamp agent position to grid cell
+                agent.rect.left = max(agent.rect.left, rect.left + 2)
+                agent.rect.right = min(agent.rect.right, rect.right - 2)
+                agent.rect.top = max(agent.rect.top, rect.top + 2)
+                agent.rect.bottom = min(agent.rect.bottom, rect.bottom - 2)
+        # else: do nothing if no grid cell assigned
 
     def set_next_switch_time(self, agent, current_time, to_social):
         if to_social:
@@ -585,9 +582,9 @@ class Game:
                 padding = 10
                 for agent in self.all_sprites:
                     agent.rect.left = max(agent.rect.left, home_zone.left + padding)
-                    agent.rect.right = min(agent.rect.right, home_zone.right - padding)
+                    agent.rect.right = min(agent.rect.right, home_zone.right + padding)
                     agent.rect.top = max(agent.rect.top, home_zone.top + padding)
-                    agent.rect.bottom = min(agent.rect.bottom, home_zone.bottom - padding)
+                    agent.rect.bottom = min(agent.rect.bottom, home_zone.bottom + padding)
                 self.screen.fill((255, 255, 255))
                 self.draw_zones()
                 self.game_clock.draw(self.screen)
@@ -929,7 +926,7 @@ class Game:
                             doubter.rect.y += random.choice([-5, 5])
                         break
 
-            # DOUBTER + DISINFORMANT -> BELIEVER (doubter gets convinced)
+            # DOUBTER + DISINFORMANT -> EXPOSED (not directly to believer)
             for doubter in list(self.doubter_group):
                 for disinformant in list(self.disinformant_group):
                     if pygame.sprite.collide_rect(doubter, disinformant):
@@ -940,16 +937,96 @@ class Game:
                             misinformant_exposure=1
                         )
                         if np.random.rand() < prob:
-                            print("CONVERTING DOUBTER TO BELIEVER (Disinformant contact)")
-                            new_believer = Believer(self.believer_group, self.all_sprites)
-                            new_believer.rect.center = doubter.rect.center
-                            new_believer.emotional_valence = doubter.emotional_valence
+                            print("CONVERTING DOUBTER TO EXPOSED (Disinformant contact)")
+                            new_exposed = Exposed(self.exposed_group, self.all_sprites)
+                            new_exposed.rect.center = doubter.rect.center
+                            new_exposed.emotional_valence = doubter.emotional_valence
                             if hasattr(doubter, "skepticism"):
-                                new_believer.skepticism = doubter.skepticism
+                                new_exposed.skepticism = doubter.skepticism
                             else:
-                                new_believer.skepticism = random.uniform(0.2, 0.8)
+                                new_exposed.skepticism = random.uniform(0.2, 0.8)
                             doubter.kill()
                             self.doubter_count -= 1
+                            self.all_sprites.add(new_exposed)
+                            self.exposed_group.add(new_exposed)
+                            self.exposed_count += 1
+                            disinformant.rect.x += random.choice([-5, 5])
+                            disinformant.rect.y += random.choice([-5, 5])
+                        break
+
+            # EXPOSED + BELIEVER -> BELIEVER (this is the ONLY way to become believer)
+            for exposed in list(self.exposed_group):
+                for believer in list(self.believer_group):
+                    if pygame.sprite.collide_rect(exposed, believer):
+                        prob = change_probability(
+                            exposed,
+                            influencer=believer,
+                            environment_factor=1.2 if self.zones["social"].collidepoint(exposed.rect.center) else 1.0
+                        )
+                        if np.random.rand() < prob:
+                            print("CONVERTING EXPOSED TO BELIEVER (Believer contact)")
+                            new_believer = Believer(self.believer_group, self.all_sprites)
+                            new_believer.rect.center = exposed.rect.center
+                            new_believer.emotional_valence = exposed.emotional_valence
+                            if hasattr(exposed, "skepticism"):
+                                new_believer.skepticism = exposed.skepticism
+                            else:
+                                new_believer.skepticism = random.uniform(0.2, 0.8)
+                            exposed.kill()
+                            self.exposed_count -= 1
+                            self.all_sprites.add(new_believer)
+                            self.believer_group.add(new_believer)
+                            self.believer_count += 1
+                            believer.rect.x += random.choice([-5, 5])
+                            believer.rect.y += random.choice([-5, 5])
+                        break
+
+            # BELIEVER + RECOVERED -> RECOVERED (believer becomes recovered if both in home)
+            for believer in list(self.believer_group):
+                for recovered in list(self.recovered_group):
+                    if (
+                        pygame.sprite.collide_rect(believer, recovered)
+                        and self.zones["home"].collidepoint(believer.rect.center)
+                        and self.zones["home"].collidepoint(recovered.rect.center)
+                    ):
+                        prob = change_probability(
+                            believer,
+                            influencer=recovered,
+                            environment_factor=1.0  # Home zone, no bonus
+                        )
+                        if np.random.rand() < prob:
+                            print("CONVERTING BELIEVER TO RECOVERED (Recovered contact in home)")
+                            new_recovered = Recovered(self.recovered_group, self.all_sprites)
+                            new_recovered.rect.center = believer.rect.center
+                            if hasattr(believer, "skepticism"):
+                                new_recovered.skepticism = believer.skepticism
+                            else:
+                                new_recovered.skepticism = random.uniform(0.2, 0.8)
+                            believer.kill()
+                            self.believer_count -= 1
+                            self.all_sprites.add(new_recovered)
+                            self.recovered_group.add(new_recovered)
+                            self.recovered_count += 1
+                            recovered.rect.x += random.choice([-5, 5])
+                            recovered.rect.y += random.choice([-5, 5])
+                        break
+
+            # EXPOSED + DISINFORMANT -> BELIEVER (high likelihood)
+            for exposed in list(self.exposed_group):
+                for disinformant in list(self.disinformant_group):
+                    if pygame.sprite.collide_rect(exposed, disinformant):
+                        prob = 0.85  # High likelihood, you can tweak this value
+                        if np.random.rand() < prob:
+                            print("CONVERTING EXPOSED TO BELIEVER (Disinformant contact)")
+                            new_believer = Believer(self.believer_group, self.all_sprites)
+                            new_believer.rect.center = exposed.rect.center
+                            new_believer.emotional_valence = exposed.emotional_valence
+                            if hasattr(exposed, "skepticism"):
+                                new_believer.skepticism = exposed.skepticism
+                            else:
+                                new_believer.skepticism = random.uniform(0.2, 0.8)
+                            exposed.kill()
+                            self.exposed_count -= 1
                             self.all_sprites.add(new_believer)
                             self.believer_group.add(new_believer)
                             self.believer_count += 1
@@ -1072,3 +1149,4 @@ class Game:
 if __name__ == "__main__":
     game = Game()
     game.run()
+
