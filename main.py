@@ -124,7 +124,7 @@ class Game:
         pygame.display.set_icon(gameIcon)
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         self.clock = pygame.time.Clock()  
-        self.fps = 60
+        self.fps = 600
 
         # Create game clock
         self.game_clock = Clock(self.screen_width // 2 - 50, 10)
@@ -574,7 +574,6 @@ class Game:
             sim_days = 7
 
         counts = self.setup_screen()
-        # Store global emotional valence as a value between 0 and 1
         self.global_emotional_valence = counts.get("Emotional Valence", 5) / 10.0
         self.initialize_agents(counts)
         self.setup_logging()
@@ -584,15 +583,20 @@ class Game:
         self.game_clock.simulation_time = sim_start_time
         self.game_clock.last_update = pygame.time.get_ticks()
 
+        # --- NEW: Set fixed simulation step (e.g., 1 minute per frame) ---
+        SIM_STEP_MINUTES = 1  # 1 simulated minute per frame/update
+
         running = True
         while running:
-            # --- Handle window close event globally ---
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
                     pygame.quit()
                     sys.exit()
-                    
+
+            # --- Instead of self.game_clock.update(), manually advance time ---
+            self.game_clock.simulation_time += timedelta(minutes=SIM_STEP_MINUTES)
+
             current_hour = self.game_clock.get_hour()
             current_minute = self.game_clock.get_minute()
 
@@ -615,7 +619,6 @@ class Game:
                     self.screen.blit(sleeping_img, agent.rect)
                 pygame.display.flip()
                 self.clock.tick(self.fps)
-                self.game_clock.update()
                 if self.game_clock.simulation_time >= self.sim_end_time:
                     print("Simulation complete.")
                     self.log_current_state(self.game_clock.simulation_time)
@@ -648,7 +651,6 @@ class Game:
                 self.draw_stats_box()
                 pygame.display.flip()
                 self.clock.tick(self.fps)
-                self.game_clock.update()
                 if self.game_clock.simulation_time >= self.sim_end_time:
                     print("Simulation complete.")
                     self.log_current_state(self.game_clock.simulation_time)
@@ -684,7 +686,6 @@ class Game:
                 self.draw_stats_box()
                 pygame.display.flip()
                 self.clock.tick(self.fps)
-                self.game_clock.update()
                 if self.game_clock.simulation_time >= self.sim_end_time:
                     print("Simulation complete.")
                     self.log_current_state(self.game_clock.simulation_time)
@@ -742,7 +743,6 @@ class Game:
                 self.draw_stats_box()
                 pygame.display.flip()
                 self.clock.tick(self.fps)
-                self.game_clock.update()
                 if self.game_clock.simulation_time >= self.sim_end_time:
                     print("Simulation complete.")
                     self.log_current_state(self.game_clock.simulation_time)
@@ -778,7 +778,6 @@ class Game:
             self.draw_stats_box()
             pygame.display.flip()
             self.clock.tick(self.fps)
-            self.game_clock.update()
             if self.game_clock.simulation_time >= self.sim_end_time:
                 print("Simulation complete.")
                 self.log_current_state(self.game_clock.simulation_time)
