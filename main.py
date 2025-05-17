@@ -124,7 +124,7 @@ class Game:
         pygame.display.set_icon(gameIcon)
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         self.clock = pygame.time.Clock()  
-        self.fps = 600
+        self.fps = 6000
 
         # Create game clock
         self.game_clock = Clock(self.screen_width // 2 - 50, 10)
@@ -527,8 +527,8 @@ class Game:
         """Initialize logging system with CSV file"""
         self.log_file = open('simulation_log.csv', 'w', newline='')
         self.log_writer = csv.writer(self.log_file)
-        # Write header row
         self.log_writer.writerow([
+            'Day',
             'Time', 
             'Susceptible', 
             'Exposed', 
@@ -542,8 +542,10 @@ class Game:
 
     def log_current_state(self, current_time):
         """Log current agent counts to file"""
+        day_num = (current_time - datetime(2023, 1, 1, 6, 0)).days + 1  # Day 1-based
         time_str = current_time.strftime("%H:%M")
         self.log_writer.writerow([
+            day_num,
             time_str,
             self.susceptible_count,
             self.exposed_count,

@@ -95,11 +95,14 @@ class Exposed(pygame.sprite.Sprite):
                 break
 
     def handle_collision(self, other):
-        normal = pygame.math.Vector2(random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5))
-        if normal.length() < 1e-6:  # Use a small threshold instead of == 0
-            normal = pygame.math.Vector2(1, 0)
+        # Calculate normal vector
+        normal = pygame.math.Vector2(self.rect.centerx - other.rect.centerx,
+                                     self.rect.centery - other.rect.centery)
+        if normal.length_squared() == 0:
+            # If normal is zero, pick a random direction
+            normal = pygame.math.Vector2(random.choice([-1, 1]), random.choice([-1, 1]))
+        normal = normal.normalize()
         self.direction_vector = self.direction_vector.reflect(normal).normalize()
-        self.update_direction_facing()
     
     def update(self):
         self.handle_movement()
