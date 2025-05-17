@@ -65,7 +65,7 @@ class Clock:
         self.font = pygame.font.SysFont('Consolas', 32)
         self.position = (x, y)
         self.simulation_time = datetime(2023, 1, 1, 6, 0)
-        self.time_multiplier = 60  # 1 hour per real second (10 sec/hour)
+        self.time_multiplier = 10  # 1 hour per real second (10 sec/hour)
         self.last_update = pygame.time.get_ticks()
     
     def update(self):
