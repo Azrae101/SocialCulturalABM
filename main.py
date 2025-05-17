@@ -24,14 +24,6 @@ def change_probability(agent, influencer=None, environment_factor=1.0, misinform
     misinfo_bonus = min(0.05 * misinformant_exposure, 0.25)
     env = environment_factor
 
-    def get_environment_factor(self, pos):
-        if self.zones["home"].collidepoint(pos):
-            return 1.0
-        elif self.zones["work"].collidepoint(pos):
-            return 0.5
-        elif self.zones["social"].collidepoint(pos):
-            return 0.7
-
     prob = influence * valence_prob * skepticism_factor * env
     prob += misinfo_bonus
 
@@ -563,6 +555,16 @@ class Game:
         ])
         self.log_file.flush()  # Ensure data is written to disk
 
+    def get_environment_factor(self, pos):
+        """Return a factor based on the agent's zone."""
+        if self.zones["home"].collidepoint(pos):
+            return 1.0
+        elif self.zones["work"].collidepoint(pos):
+            return 0.5
+        elif self.zones["social"].collidepoint(pos):
+            return 0.7
+        return 1.0  # Default if not in any zone
+
     def run(self):
         # --- Main menu for simulation duration ---
         sim_choice = self.main_menu()
@@ -861,7 +863,7 @@ class Game:
                     prob = change_probability(
                         exposed,
                         influencer=believer,
-                        environment_factor=self.get_environment_factor(susceptible.rect.center),
+                        environment_factor=self.get_environment_factor(exposed.rect.center),
                     )
                     if np.random.rand() < prob:
                         # Exposed → Believer
@@ -883,7 +885,7 @@ class Game:
                     prob = change_probability(
                         exposed,
                         influencer=doubter,
-                        environment_factor=self.get_environment_factor(susceptible.rect.center),
+                        environment_factor=self.get_environment_factor(exposed.rect.center),
                     )
                     if np.random.rand() < prob:
                         # Exposed → Doubter
@@ -928,7 +930,7 @@ class Game:
                     prob = change_probability(
                         believer,
                         influencer=doubter,
-                        environment_factor=self.get_environment_factor(susceptible.rect.center),
+                        environment_factor=self.get_environment_factor(believer.rect.center),
                     )
                     if np.random.rand() < prob:
                         # Believer → Recovered
@@ -949,7 +951,7 @@ class Game:
                     prob = change_probability(
                         doubter,
                         influencer=disinformant,
-                        environment_factor=self.get_environment_factor(susceptible.rect.center),
+                        environment_factor=self.get_environment_factor(doubter.rect.center),
                         misinformant_exposure=1
                     )
                     if np.random.rand() < prob:
@@ -991,3 +993,105 @@ class Game:
 
         self.total_misinformed = self.believer_count + self.exposed_count
 
+        # --- Social media specific logic ---
+        if (7 <= current_hour < 8) or (19 <= current_hour < 21):
+            # Agents in social media: move freely
+            # Agents in home: restrict to grid cell
+            for agent in self.all_sprites:
+                if hasattr(agent, "in_social") and not agent.in_social:
+                    # Restrict to grid cell
+                    self.enforce_home_grid_boundaries(agent)
+            # Only check collisions within each grid cell for home agents
+            for cell, agents in self.home_grid_agents.items():
+                for i, agent in enumerate(agents):
+                    for other in agents[i+1:]:
+                        if pygame.sprite.collide_rect(agent, other):
+                            agent.handle_collision(other)
+                            other.handle_collision(agent)
+            # Social agents move/collide as normal (handled by all_sprites.update())
+            self.all_sprites.update()
+            for agent in self.all_sprites:
+                if hasattr(agent, "in_social") and not agent.in_social:
+                    self.enforce_home_grid_boundaries(agent)
+
+        # --- Stop simulation if time is up ---
+        if self.game_clock.simulation_time >= self.sim_end_time:
+            print("Simulation complete.")
+            self.log_current_state(self.game_clock.simulation_time)
+            running = False
+            
+        # Log every 10 minutes
+        current_minute = self.game_clock.get_minute()
+        if current_minute % 10 == 0 and current_minute != self.last_log_time:
+            self.log_current_state(self.game_clock.simulation_time)
+            self.last_log_time = current_minute
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+        # --- Drawing section ---
+        self.screen.fill((255, 255, 255))
+        self.draw_zones()
+        self.game_clock.draw(self.screen)
+        # Show agents at all times except midnight-6am
+        #if not (0 <= current_hour < 6):
+        if True:
+            # 06:00-06:45 - Show sleeping agents
+            if 6 <= current_hour < 7 and current_minute < 30:
+                for agent in self.all_sprites:
+                    sleeping_img = pygame.Surface((agent.rect.width, agent.rect.height))
+                    sleeping_img.fill((200, 200, 200))  # Light gray
+                    sleeping_img.set_alpha(200)  # Slightly transparent
+                    self.screen.blit(sleeping_img, agent.rect)
+            else:
+                # Normal drawing for active agents
+                self.all_sprites.draw(self.screen)
+                self.draw_stats_box()
+
+        # Interface:
+        # Draw the stats box first
+        stats_box_rect = pygame.Rect(self.screen_width - 220, self.screen_height - 640, 180, 300)  # Narrower (180px) and further right
+        pygame.draw.rect(self.screen, (50, 50, 50), stats_box_rect)
+
+        # Draw the counts inside the box, in white
+        font32 = pygame.font.SysFont('Concolas', 32)
+        font35 = pygame.font.SysFont('Concolas', 35)
+
+        # MISINFORMED section (adjust positions relative to the new box)
+        pygame.draw.circle(self.screen, (160, 0, 0), (self.screen_width - 130, self.screen_height - 205), 65)  # Smaller circle (65 radius)
+        points_label = pygame.font.SysFont('Concolas', 30).render('Misinformed', True, (20, 20, 10))  # Smaller font
+        points_text = pygame.font.SysFont('Concolas', 45).render(str(self.total_misinformed), True, (255, 255, 255))  # Smaller font
+        self.screen.blit(points_label, (self.screen_width - 210, self.screen_height - 320))  # Adjusted position
+        self.screen.blit(points_text, (self.screen_width - 145, self.screen_height - 220))  # Adjusted position
+
+        # COUNT title
+        count_title = pygame.font.SysFont('Concolas', 30).render('COUNT', True, (255, 255, 255))  # Smaller font
+        self.screen.blit(count_title, (self.screen_width - 200, self.screen_height - 660))  # Adjusted position
+
+        # Update the draw_count function for narrower layout:
+        def draw_count(label, count, y):
+            label_surf = font32.render(label, True, (255, 255, 255))
+            count_surf = font35.render(str(count), True, (255, 255, 255))
+            self.screen.blit(label_surf, (self.screen_width - 210, y))  # Adjusted left position
+            self.screen.blit(count_surf, (self.screen_width - 120, y))  # Adjusted right position
+            
+        # Call with proper vertical spacing
+        draw_count('SU:', self.susceptible_count, self.screen_height - 620)
+        draw_count('EX:', self.exposed_count, self.screen_height - 580)
+        draw_count('BE:', self.believer_count, self.screen_height - 540)
+        draw_count('DO:', self.doubter_count, self.screen_height - 500)
+        draw_count('RE:', self.recovered_count, self.screen_height - 460)
+        draw_count('DI:', self.disinformant_count, self.screen_height - 420)
+
+        pygame.display.flip()
+        self.clock.tick(self.fps)
+
+    def __del__(self):
+        """Cleanup method to close log file"""
+        if hasattr(self, 'log_file'):
+            self.log_file.close()
+
+if __name__ == "__main__":
+    game = Game()
+    game.run()
