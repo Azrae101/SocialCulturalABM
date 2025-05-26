@@ -4,15 +4,15 @@ A Pygame-based simulation modeling the spread of misinformation through agent in
 
 ## Features
 
-- **Agent States**: Susceptible, Exposed, Believer, Doubter, Recovered, Disinformant
-- **Time-Based Zones**: Agents move between home, work, and social media zones based on real-world time (sleep, work hours, social media hours)
-- **Dynamic Interactions**: Probabilistic state changes influenced by:
+- Agent States: Susceptible, Exposed, Believer, Doubter, Recovered, Disinformant
+- Time-Based Zones: Agents move between home, work, and social media zones based on real-world time (sleep, work hours, social media hours)
+- Dynamic Interactions: Probabilistic state changes influenced by:
   - Emotional valence
   - Skepticism levels
   - Environmental factors (zone-dependent influence multipliers)
   - Disinformant manipulation
-- **Data Logging**: CSV output tracking agent counts and environment states
-- **Visualization**: Real-time statistics dashboard with agent counts and misinformed totals
+- Data Logging: CSV output tracking agent counts and environment states
+- Visualization: Real-time statistics dashboard with agent counts and misinformed totals
 
 ## Installation
 
@@ -20,3 +20,34 @@ A Pygame-based simulation modeling the spread of misinformation through agent in
    ```bash
    git clone https://github.com/yourusername/misinformation-simulation.git
    cd misinformation-simulation
+
+2. Create and activate a virtual environment (recommended):
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate.bat  # Windows
+
+3. Install dependencies:
+pip install -r requirements.txt
+
+Place agent images in an Images/ directory (optional for visual customization)
+
+# Usage
+
+## Run the simulation
+python main.py
+
+## Controls
+1. Choose simulation duration (1 day or 1 week)
+2. Set initial agent counts using sliders
+3. Watch real-time spread dynamics:
+  - Home zone agents cluster in grid cells
+  - Work zone interactions during daytime
+  - Social media spikes during morning/evening hours
+  - Sleep periods (00:00-06:45) freeze movement
+
+# Outputs
+simulation_log.csv: Timestamped records of:
+- Agent state counts
+- Total misinformed agents
+- Active environment
+- Daily progression
