@@ -1,0 +1,24 @@
+# Misinformation Spread Simulation
+
+A Pygame-based simulation modeling the spread of misinformation through agent interactions in different environments (home, work, social media). Agents transition between states like Susceptible, Exposed, Believer, Doubter, and Recovered based on interactions, skepticism, and environmental factors.
+
+![Simulation Preview](Images/running_down_1.png) *Replace with your own screenshot*
+
+## Features
+
+- **Agent States**: Susceptible, Exposed, Believer, Doubter, Recovered, Disinformant
+- **Time-Based Zones**: Agents move between home, work, and social media zones based on real-world time (sleep, work hours, social media hours)
+- **Dynamic Interactions**: Probabilistic state changes influenced by:
+  - Emotional valence
+  - Skepticism levels
+  - Environmental factors (zone-dependent influence multipliers)
+  - Disinformant manipulation
+- **Data Logging**: CSV output tracking agent counts and environment states
+- **Visualization**: Real-time statistics dashboard with agent counts and misinformed totals
+
+## Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/misinformation-simulation.git
+   cd misinformation-simulation
