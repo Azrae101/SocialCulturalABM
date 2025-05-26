@@ -2,8 +2,6 @@
 
 A Pygame-based simulation modeling the spread of misinformation through agent interactions in different environments (home, work, social media). Agents transition between states like Susceptible, Exposed, Believer, Doubter, and Recovered based on interactions, skepticism, and environmental factors.
 
-![Simulation Preview](Images/running_down_1.png) *Replace with your own screenshot*
-
 ## Features
 
 - **Agent States**: Susceptible, Exposed, Believer, Doubter, Recovered, Disinformant
