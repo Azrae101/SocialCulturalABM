@@ -1,0 +1,2487 @@
+---
+title: "Soccult_ABM_exam"
+author: "Clara Holst"
+date: "`r Sys.Date()`"
+output: html_document
+---
+Variables:
+Day,Time,Susceptible,Exposed,Believer,Doubter,Recovered,Disinformant,Total_Misinformed
+
+Read all files from here: D:\UNI\4th Semester\Social and Cultural Dynamics\Misinformation\Data\
+
+Sanity checks in this folder: "D:\UNI\4th Semester\Social and Cultural Dynamics\Misinformation\Data\Sanity"
+
+First research question here: "D:\UNI\4th Semester\Social and Cultural Dynamics\Misinformation\Data\RQ0"
+
+Second research question here: "D:\UNI\4th Semester\Social and Cultural Dynamics\Misinformation\Data\RQ1"
+
+Third research question here: "D:\UNI\4th Semester\Social and Cultural Dynamics\Misinformation\Data\RQ2"
+
+Fourth research question here: Day: "D:\UNI\4th Semester\Social and Cultural Dynamics\Misinformation\Data\RQ3\Day" & Week: "D:\UNI\4th Semester\Social and Cultural Dynamics\Misinformation\Data\RQ3\Week"
+
+```{r}
+# Libraries
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+```
+
+# Checking the most recent simulation run (CH)
+```{r}
+df <- read.csv("D:\\UNI\\4th Semester\\Social and Cultural Dynamics\\Misinformation\\SocialCulturalABM\\simulation_log.csv")
+
+# Load necessary libraries
+library(ggplot2)
+
+# Read the CSV
+df <- read.csv("D:\\UNI\\4th Semester\\Social and Cultural Dynamics\\Misinformation\\SocialCulturalABM\\simulation_log.csv")
+
+# Convert Time to a numeric variable for regression (e.g., minutes since start)
+df$Time_num <- seq(0, by = 10, length.out = nrow(df))  # assuming 10-minute intervals
+
+# Plot each variable with regression line
+ggplot() +
+  geom_line(data = df, aes(x = Time_num, y = Susceptible, color = "Susceptible")) +
+  geom_smooth(data = df, aes(x = Time_num, y = Susceptible, color = "Susceptible"), method = "lm", se = FALSE, linetype = "dashed") +
+
+  geom_line(data = df, aes(x = Time_num, y = Exposed, color = "Exposed")) +
+  geom_smooth(data = df, aes(x = Time_num, y = Exposed, color = "Exposed"), method = "lm", se = FALSE, linetype = "dashed") +
+
+  geom_line(data = df, aes(x = Time_num, y = Believer, color = "Believer")) +
+  geom_smooth(data = df, aes(x = Time_num, y = Believer, color = "Believer"), method = "lm", se = FALSE, linetype = "dashed") +
+
+  geom_line(data = df, aes(x = Time_num, y = Doubter, color = "Doubter")) +
+  geom_smooth(data = df, aes(x = Time_num, y = Doubter, color = "Doubter"), method = "lm", se = FALSE, linetype = "dashed") +
+
+  geom_line(data = df, aes(x = Time_num, y = Recovered, color = "Recovered")) +
+  geom_smooth(data = df, aes(x = Time_num, y = Recovered, color = "Recovered"), method = "lm", se = FALSE, linetype = "dashed") +
+
+  geom_line(data = df, aes(x = Time_num, y = Disinformant, color = "Disinformant")) +
+  geom_smooth(data = df, aes(x = Time_num, y = Disinformant, color = "Disinformant"), method = "lm", se = FALSE, linetype = "dashed") +
+
+  geom_line(data = df, aes(x = Time_num, y = Total_Misinformed, color = "Total_Misinformed")) +
+  geom_smooth(data = df, aes(x = Time_num, y = Total_Misinformed, color = "Total_Misinformed"), method = "lm", se = FALSE, linetype = "dashed") +
+
+  labs(title = "Agent Category Trends with Linear Regression",
+       x = "Time (minutes since start)",
+       y = "Count",
+       color = "Category") +
+  theme_minimal()
+
+```
+# Sanity Check (CH)
+
+## Concatenated plots (CH)
+```{r}
+sanity_dir <- "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/Sanity"
+files <- list.files(sanity_dir, pattern = "\\.csv$", full.names = TRUE)
+
+# Prepare list to store data frames for combined plot
+all_dfs <- list()
+
+for (file in files) {
+  df <- read.csv(file)
+  
+  # Ensure Day column exists; if missing, set Day = 1
+  if (!"Day" %in% colnames(df)) {
+    df$Day <- 1
+  }
+  
+  # Store the source file name (optional, useful for grouping)
+  df$Run <- basename(file)
+  
+  # Add a time numeric column if needed for smoothing in combined plot
+  # Here assuming Time is numeric or can be used as is
+  df$Time_num <- as.numeric(df$Time) / 60  # Convert minutes to hours
+  
+  all_dfs[[basename(file)]] <- df
+}
+
+# Combine all data frames
+combined_data <- bind_rows(all_dfs)
+
+# Convert to long format for plotting
+long_data <- combined_data %>%
+  pivot_longer(
+    cols = c(Susceptible, Exposed, Believer, Doubter, Recovered, Disinformant, Total_Misinformed),
+    names_to = "Category",
+    values_to = "Count"
+  )
+
+# Define your specific colors
+state_colors <- c(
+  "Susceptible"   = "#00FF00",
+  "Exposed"       = "#FFFF00",
+  "Believer"      = "#FF0000",
+  "Doubter"       = "#0000FF",
+  "Recovered"     = "#A9A9A9",
+  "Disinformant"  = "#800080",
+  "Total_Misinformed" = "#FFA500"  # Adding color for Total_Misinformed if needed
+)
+
+# Split into day-based and week-based scenarios using Run label
+long_data_day <- long_data %>% filter(grepl("24", Run))
+long_data_week <- long_data %>% filter(grepl("Week", Run))
+
+# --- Plot 1: 24-hour scedistnarios ---
+plot_day <- ggplot(long_data_day, aes(x = Time_num, y = Count)) +
+  geom_line(aes(color = Category, group = interaction(Run, Category)), alpha = 0.25, size = 0.4) +
+  geom_smooth(aes(color = Category, group = Category), method = "loess", se = FALSE, size = 1) +
+  scale_color_manual(values = state_colors) +
+  facet_wrap(~ Run, ncol = 2, scales = "free_y") +
+  labs(
+    title = "Agent Dynamics Over 24 Hours",
+    subtitle = "LOESS-smoothed trends by agent category",
+    x = "Time (hours)",
+    y = "Agent Count",
+    color = "Agent Category"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(face = "bold")
+  )
+
+# --- Plot 2: 1-week scenarios ---
+plot_week <- ggplot(long_data_week, aes(x = Time_num, y = Count)) +
+  geom_line(aes(color = Category, group = interaction(Run, Category)), alpha = 0.25, size = 0.4) +
+  geom_smooth(aes(color = Category, group = Category), method = "loess", se = FALSE, size = 1) +
+  scale_color_manual(values = state_colors) +
+  facet_wrap(~ Run, ncol = 2, scales = "free_y") +
+  labs(
+    title = "Agent Dynamics Over One Week",
+    subtitle = "LOESS-smoothed trends by agent category",
+    x = "Time (hours)",
+    y = "Agent Count",
+    color = "Agent Category"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(face = "bold")
+  )
+
+plot_day
+plot_week
+```
+
+## Separate Day and Week plots (CH)
+```{r}
+nice_titles <- c(
+  "Sanity_24_EMO-0.csv"  = "Day Low Emotion",
+  "Sanity_24_EMO-10.csv"  = "Day High Emotion",
+  "Sanity_Week_EMO-0.csv" = "Week Low Emotion",
+  "Sanity_Week_EMO-10.csv" = "Week High Emotion"
+)
+
+# Convert Time to numeric hours (if not already done)
+long_data <- long_data %>%
+  mutate(
+    Time_num = as.numeric(substr(Time, 1, 2)) + as.numeric(substr(Time, 4, 5)) / 60
+  )
+
+# Unique files in your data
+file_list <- unique(long_data$file)
+
+plots_day <- list()
+plots_week <- list()
+
+for (f in file_list) {
+  df <- long_data %>% filter(file == f)
+  
+  is_day <- any(grepl("24", df$Run))
+  is_week <- any(grepl("Week", df$Run))
+  
+  # Use friendly title if available, else fallback to filename
+  plot_title <- nice_titles[basename(f)]
+  if (is.na(plot_title)) plot_title <- basename(f)
+  
+  p <- ggplot(df, aes(x = Time_num, y = Count)) +
+    geom_line(aes(color = Category, group = Category), alpha = 0.25, size = 0.4) +
+    geom_smooth(aes(color = Category, group = Category), method = "loess", se = FALSE, size = 1) +
+    scale_color_manual(values = state_colors) +   # <-- use your custom colors here
+    labs(
+      title = plot_title,
+      subtitle = "LOESS-smoothed trends by agent category",
+      x = "Time (hours)",
+      y = "Agent Count",
+      color = "Agent Category"
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(
+      legend.position = "bottom",
+      strip.text = element_text(face = "bold")
+    )
+  
+  if (is_day) {
+    p <- p +
+      scale_x_continuous(
+        breaks = seq(0, 24, by = 4),
+        limits = c(0, 24),
+        labels = function(x) paste0(x, "h")
+      )
+    plots_day[[f]] <- p
+  } else if (is_week) {
+    # For week data, extend Time_num with days (if needed)
+    # (If not yet done, make sure Time_num is continuous over days)
+    if (!"Time_num" %in% colnames(df) || max(df$Time_num, na.rm = TRUE) <= 24) {
+      df <- df %>%
+        mutate(
+          hours_in_day = as.numeric(substr(Time, 1, 2)) + as.numeric(substr(Time, 4, 5)) / 60,
+          Time_num = (Day - 1) * 24 + hours_in_day
+        )
+    }
+    
+    p <- p %+% df +  # Update plot data to new df with corrected Time_num
+      scale_x_continuous(
+        breaks = seq(0, 168, by = 24),
+        limits = c(0, 168),
+        labels = function(x) paste0("Day ", x / 24)
+      )
+    
+    plots_week[[f]] <- p
+  }
+}
+
+# To view plots for day-based files:
+for (p in plots_day) print(p)
+
+# To view plots for week-based files:
+for (p in plots_week) print(p)
+
+```
+# RQ0 (CH) 
+Susceptible vs. Doubter, and emotional valence
+
+```{r}
+# === Set working directory ===
+base_dir <- "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ0"
+setwd(base_dir)
+
+# === Define file groups ===
+susceptible_files <- paste0("RQ0_", 1:5, "_1.csv")
+doubter_files     <- paste0("RQ0_", 1:5, "_2.csv")
+
+# === Load and annotate simulations ===
+load_sim_data <- function(file, group_label) {
+  df <- read.csv(file)
+  df$Time_num <- seq(0, by = 10, length.out = nrow(df))  # adjust if needed
+  df$Group <- group_label
+  df$Run <- file
+  return(df)
+}
+
+# === Load all data using base R ===
+susceptible_data <- do.call(rbind, lapply(susceptible_files, load_sim_data, group_label = "Only Susceptibles"))
+doubter_data     <- do.call(rbind, lapply(doubter_files,     load_sim_data, group_label = "Only Doubters"))
+all_data <- rbind(susceptible_data, doubter_data)
+
+# === Extract the last time point data per Run and Group ===
+last_time_points <- all_data %>%
+  group_by(Group, Run) %>%
+  filter(Time_num == max(Time_num)) %>%
+  select(Group, Run, Total_Misinformed)
+
+# === Print total misinformed per group and run at the end ===
+print("Total Misinformed at the end of simulation by Group and Run:")
+print(last_time_points)
+
+# === Reshape for plotting excluding Total_Misinformed ===
+long_data <- all_data %>%
+  pivot_longer(cols = c(Susceptible, Exposed, Believer, Doubter, Recovered, Disinformant),
+               names_to = "Category", values_to = "Count")
+
+state_colors <- c(
+  "Susceptible"   = "#00FF00",
+  "Exposed"       = "#FFFF00",
+  "Believer"      = "#FF0000",
+  "Doubter"       = "#0000FF",
+  "Recovered"     = "#A9A9A9",
+  "Disinformant"  = "#800080"
+)
+
+# === Plot: Believers and Exposed only ===
+
+plot_data <- long_data %>% filter(Category %in% c("Believer", "Exposed"))
+
+ggplot(plot_data, aes(x = Time_num, y = Count, group = Category)) +
+  # Shadow for Exposed (black thicker line behind)
+  stat_summary(
+    data = plot_data %>% filter(Category == "Exposed"),
+    fun = mean,
+    geom = "line",
+    size = 2,           # thick shadow
+    color = "black",
+    alpha = 0.6
+  ) +
+  # Main colored lines
+  stat_summary(
+    fun = mean,
+    geom = "line",
+    size = 1.25,
+    aes(color = Category)
+  ) +
+  facet_wrap(~ Group) +
+  scale_color_manual(values = state_colors) +
+  labs(title = "Believers and Exposed Over Time by Group (α = 10)",
+       x = "Time (minutes)", y = "Agent Count", color = "Agent Type") +
+  theme_minimal() +
+  theme(
+    text = element_text(color = "black"),
+    strip.text = element_text(color = "black")
+  )
+
+# === Plot: All categories except Total_Misinformed ===
+ggplot(long_data, aes(x = Time_num, y = Count, color = Category)) +
+  geom_line(aes(group = interaction(Run, Category)), alpha = 0.3) +
+  geom_smooth(aes(linetype = Group), method = "lm", se = FALSE, size = 1.2) +
+  scale_color_manual(values = state_colors) +
+  facet_wrap(~ Group) +
+  labs(
+    title = "Agent Category Trends with Linear Regression by Group (α = 10)",
+    x = "Time (minutes)",
+    y = "Agent Count",
+    color = "Agent Type",
+    linetype = "Group"
+  ) +
+  theme_minimal()
+
+```
+# RQ1 (CH)
+
+```{r}
+library(tidyverse)
+library(readr)
+options(repr.plot.width = 20, repr.plot.height = 30)  # width and height in inches
+
+# --- Step 1: Create Metadata Table ---
+# First, create the base metadata for the original files
+metadata <- tribble(
+  ~TimeType, ~Disinformants, ~Sus_Doubt, ~Valence, ~Filename,
+  "Day", 1, "15-14", 1, "RQ1_1_1a",
+  "Day", 1, "15-14", 5, "RQ1_1_5a",
+  "Day", 1, "15-14", 10, "RQ1_1_10a",
+  "Day", 2, "14-14", 1, "RQ1_2_1a",
+  "Day", 2, "14-14", 5, "RQ1_2_5a",
+  "Day", 2, "14-14", 10, "RQ1_2_10a",
+  "Day", 3, "14-13", 1, "RQ1_3_1a",
+  "Day", 3, "14-13", 5, "RQ1_3_5a",
+  "Day", 3, "14-13", 10, "RQ1_3_10a",
+  "Day", 4, "13-13", 1, "RQ1_4_1a",
+  "Day", 4, "13-13", 5, "RQ1_4_5a",
+  "Day", 4, "13-13", 10, "RQ1_4_10a",
+  "Day", 5, "13-12", 1, "RQ1_5_1a",
+  "Day", 5, "13-12", 5, "RQ1_5_5a",
+  "Day", 5, "13-12", 10, "RQ1_5_10a",
+  "Week", 1, "15-14", 1, "RQ1_1_1b",
+  "Week", 1, "15-14", 5, "RQ1_1_5b",
+  "Week", 1, "15-14", 10, "RQ1_1_10b",
+  "Week", 2, "14-14", 1, "RQ1_2_1b",
+  "Week", 2, "14-14", 5, "RQ1_2_5b",
+  "Week", 2, "14-14", 10, "RQ1_2_10b",
+  "Week", 3, "14-13", 1, "RQ1_3_1b",
+  "Week", 3, "14-13", 5, "RQ1_3_5b",
+  "Week", 3, "14-13", 10, "RQ1_3_10b",
+  "Week", 4, "13-13", 1, "RQ1_4_1b",
+  "Week", 4, "13-13", 5, "RQ1_4_5b",
+  "Week", 4, "13-13", 10, "RQ1_4_10b",
+  "Week", 5, "13-12", 1, "RQ1_5_1b",
+  "Week", 5, "13-12", 5, "RQ1_5_5b",
+  "Week", 5, "13-12", 10, "RQ1_5_10b"
+)
+
+# Add metadata for the additional simulations (assuming they have suffixes 'c' and 'd')
+additional_metadata <- metadata %>%
+  mutate(Filename = str_replace(Filename, "[a-z]$", function(x) {
+    case_when(
+      x == "a" ~ "b",
+      x == "b" ~ "c",
+      TRUE ~ x
+    )
+  }))
+
+# Combine original and additional metadata
+metadata <- bind_rows(metadata, additional_metadata)
+
+path <- "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ1"
+files <- list.files(path, pattern = "\\.csv$", full.names = TRUE)
+
+long_data <- map_dfr(files, function(f) {
+  df <- read_csv(f, show_col_types = FALSE)
+  df$file <- tools::file_path_sans_ext(basename(f))  # Get filename without .csv
+  df
+})
+
+long_data <- long_data %>%
+  left_join(metadata, by = c("file" = "Filename")) %>%
+  mutate(
+    Time_num = as.numeric(substr(Time, 1, 2)) + as.numeric(substr(Time, 4, 5)) / 60
+  )
+
+
+ggplot(
+  filter(long_data, TimeType == "Day"),
+  aes(x = Time_num, y = Believer, color = factor(Disinformants), group = interaction(Disinformants, file))
+) +
+  geom_line(alpha = 0.5) +
+  facet_wrap(~ Valence, labeller = label_both) +
+  labs(
+    title = "Believers Over Time (Day Simulations) - All Replicates",
+    x = "Time (Hours)",
+    y = "Believers",
+    color = "Disinformants"
+  ) +
+  theme_minimal()
+  
+  threshold_df <- long_data %>%
+  filter(Believer >= 8) %>%
+  group_by(Valence, Disinformants, TimeType, file) %>%
+  summarise(first_time = min(Time_num, na.rm = TRUE), .groups = "drop")
+
+summary_table <- threshold_df %>%
+  group_by(TimeType, Valence, Disinformants) %>%
+  summarise(
+    Mean_Time_Hours = mean(first_time, na.rm = TRUE),
+    SD_Time_Hours = sd(first_time, na.rm = TRUE),
+    N_Simulations = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(TimeType, Valence, Disinformants)
+
+# Print table
+print(summary_table)
+
+write_csv(summary_table, "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/summary_table.csv")
+
+long_data <- map_dfr(files, function(f) {
+  df <- read_csv(f, show_col_types = FALSE)
+  
+  # Get base filename (without timestamp if present)
+  base_name <- tools::file_path_sans_ext(basename(f)) %>%
+    str_replace("_(\\d{8}_\\d{6})$", "")  # Remove timestamp
+  
+  df$base_file <- base_name
+  df
+})
+
+# Join using the clean base names
+long_data <- long_data %>% 
+  left_join(metadata, by = c("base_file" = "Filename"))
+
+unmatched <- long_data %>% 
+  filter(is.na(TimeType)) %>% 
+  distinct(base_file)
+
+print(unmatched)
+
+summary_table <- threshold_df %>%
+  group_by(TimeType, Valence, Disinformants) %>%
+  summarise(
+    Mean_Time_Hours = mean(first_time, na.rm = TRUE),
+    SD_Time_Hours = sd(first_time, na.rm = TRUE),
+    N_Simulations = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(TimeType, Valence, Disinformants)
+
+# Print table
+print(summary_table)
+
+```
+
+```{r}
+# Separate plots
+library(tidyverse)
+library(lubridate)
+
+# Make sure Time_num is numeric hours
+long_data <- long_data %>%
+  mutate(Time_num = hour(Time) + minute(Time)/60 + second(Time)/3600)
+
+# Unique valences in your data
+valences <- sort(unique(long_data$Valence))
+
+# Function to create plot for given TimeType and Valence
+plot_by_valence <- function(data, time_type, valence_value) {
+  ggplot(filter(data, TimeType == time_type, Valence == valence_value),
+         aes(x = Time_num, y = Believer, color = factor(Disinformants))) +
+    geom_line(alpha = 0.7) +
+    labs(
+      title = paste0("Believers Over Time (", time_type, " Simulations), Valence = ", valence_value),
+      x = "Time (Hours)",
+      y = "Believers",
+      color = "Disinformants"
+    ) +
+    theme_minimal()
+}
+
+# Create lists to store plots
+day_plots <- list()
+week_plots <- list()
+
+# Loop through valences and create plots for Day and Week
+for (v in valences) {
+  day_plots[[paste0("Day_Valence_", v)]] <- plot_by_valence(long_data, "Day", v)
+  week_plots[[paste0("Week_Valence_", v)]] <- plot_by_valence(long_data, "Week", v)
+}
+
+# Now you can print or save these plots individually, for example:
+print(day_plots$Day_Valence_1)
+print(day_plots$Day_Valence_5)
+print(day_plots$Day_Valence_10)
+
+print(week_plots$Week_Valence_1)
+print(week_plots$Week_Valence_5)
+print(week_plots$Week_Valence_10)
+
+```
+
+
+```{r}
+library(lubridate)
+
+long_data <- long_data %>%
+  mutate(
+    Time_num = hour(Time) + minute(Time) / 60 + second(Time) / 3600
+  )
+
+# --- Step 6: Plot Believers Over Time (Grouped by Week) ---
+ggplot(filter(long_data, TimeType == "Week"),
+       aes(x = Time_num, y = Believer, color = factor(Disinformants))) +
+  geom_line(alpha = 0.7) +
+  facet_wrap(~ Valence, labeller = label_both) +
+  labs(
+    title = "Believers Over Time (Week Simulations)",
+    x = "Time (Hours)",
+    y = "Believers",
+    color = "Disinformants"
+  ) +
+  theme_minimal()
+
+```
+
+```{r}
+# THIS ONE
+
+library(tidyverse)
+library(readr)
+library(lubridate)
+library(patchwork)
+
+# Set much larger plot dimensions
+options(repr.plot.width = 15, repr.plot.height = 30)  # Wider and taller
+
+# --- Color Palette ---
+disinformant_colors <- c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd")
+
+# --- Data Processing (unchanged from your original code) ---
+# ... [your data loading code here] ...
+
+# --- Plotting Functions with Taller Layouts ---
+
+y_limits <- range(long_data$Believer, na.rm = TRUE)
+
+# 1. Main Summary Plot (Single tall plot per time type)
+plot_tall_summary <- function(data, time_type) {
+  ggplot(filter(data, TimeType == time_type),
+         aes(x = Time_num, y = Believer, color = factor(Disinformants))) +
+    stat_summary(fun.data = mean_cl_normal, geom = "ribbon",
+                 aes(fill = factor(Disinformants)), alpha = 0.2, color = NA) +
+    stat_summary(fun = mean, geom = "line", size = 1) +
+    facet_wrap(~ Valence, ncol = 1,  # Vertical arrangement
+               labeller = labeller(Valence = function(x) paste("Valence =", x))) +
+    scale_color_manual(values = disinformant_colors) +
+    scale_fill_manual(values = disinformant_colors) +
+    scale_y_continuous(limits = y_limits) + 
+    labs(
+      title = paste("Average Believers Over Time (", time_type, "Simulations)"),
+      x = "Time (Hours)",
+      y = "Average Number of Believers",
+      color = "Number of Disinformants",
+      fill = "Number of Disinformants"
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(
+      legend.position = "bottom",
+      panel.grid.minor = element_blank(),
+      strip.background = element_rect(fill = "grey90", color = NA),
+      strip.text = element_text(face = "bold", size = 12),
+      plot.margin = margin(1, 1, 1, 1, "cm")
+    )
+}
+
+# 2. Individual Valence Plots (Full height per plot)
+plot_tall_valence <- function(data, time_type, valence_value) {
+  ggplot(filter(data, TimeType == time_type, Valence == valence_value),
+         aes(x = Time_num, y = Believer, color = factor(Disinformants))) +
+    geom_line(alpha = 0.1, size = 0.3) +
+    stat_summary(fun = mean, geom = "line", size = 2, aes(group = Disinformants)) +
+    scale_color_manual(values = disinformant_colors) +
+    scale_y_continuous(limits = c(-0.03, 0.03)) +  # << Add here
+    labs(
+      title = paste0("Believers Over Time (", time_type, " Simulations), Valence = ", valence_value),
+      subtitle = "Faint lines: Individual replicates | Bold lines: Mean trend",
+      x = "Time (Hours)",
+      y = "Believers",
+      color = "Disinformants"
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(
+      legend.position = "bottom",
+      plot.margin = margin(1, 1, 1, 1, "cm"),
+      axis.text = element_text(size = 12),
+      axis.title = element_text(size = 14)
+    )
+}
+
+# --- Generate and Display Tall Plots ---
+
+# A. Summary Plots (one at a time)
+print(plot_tall_summary(long_data, "Day"))  # Display Day summary
+print(plot_tall_summary(long_data, "Week"))  # Display Week summary
+
+# B. Individual Valence Plots (one at a time)
+for (v in unique(long_data$Valence)) {
+  # Day plots
+  print(plot_tall_valence(long_data, "Day", v))
+  
+  # Week plots
+  print(plot_tall_valence(long_data, "Week", v))
+}
+
+# C. Enhanced Summary Table Plot (tall version)
+summary_plot <- summary_table %>%
+  ggplot(aes(x = factor(Disinformants), y = Mean_Time_Hours,
+             color = factor(Valence), group = Valence)) +
+  geom_point(size = 4) +
+  geom_line(size = 1) +
+  geom_errorbar(aes(ymin = Mean_Time_Hours - SD_Time_Hours,
+                 ymax = Mean_Time_Hours + SD_Time_Hours), width = 0.2, size = 1) +
+  facet_wrap(~TimeType, ncol = 1) +  # Vertical arrangement
+  scale_color_brewer(palette = "Set1") +
+  labs(
+    title = "Time to Reach 8 Believers",
+    x = "Number of Disinformants",
+    y = "Mean Time (Hours)",
+    color = "Valence"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(size = 12, face = "bold"),
+    plot.margin = margin(1, 1, 1, 1, "cm")
+  )
+
+print(summary_plot)
+
+# B. Individual Valence Plots (one at a time, extra tall)
+valences <- sort(unique(long_data$Valence))
+
+for (v in valences) {
+  cat(paste("Rendering: Day Simulation - Valence =", v, "\n"))
+  print(plot_tall_valence(long_data, "Day", v))
+  
+  cat(paste("Rendering: Week Simulation - Valence =", v, "\n"))
+  print(plot_tall_valence(long_data, "Week", v))
+}
+
+for (v in valences) {
+  day_plot <- plot_tall_valence(long_data, "Day", v)
+  week_plot <- plot_tall_valence(long_data, "Week", v)
+
+  ggsave(paste0("Day_Valence_", v, ".png"), day_plot, width = 12, height = 14, dpi = 300)
+  ggsave(paste0("Week_Valence_", v, ".png"), week_plot, width = 12, height = 14, dpi = 300)
+}
+
+# Combine all six plots into one figure (2 rows, 3 columns)
+combined_plot <- (
+  day_plots$Day_Valence_1 + day_plots$Day_Valence_5 + day_plots$Day_Valence_10 +
+  week_plots$Week_Valence_1 + week_plots$Week_Valence_5 + week_plots$Week_Valence_10
+) + 
+  plot_layout(ncol = 3, nrow = 2, guides = "collect") &
+  theme(legend.position = "bottom")
+
+
+# Add a figure caption
+combined_plot <- combined_plot + plot_annotation(
+  title = "Figure: Believers Over Time by Valence and Time Granularity",
+  subtitle = "Each panel shows simulation results by Valence level (1, 5, 10) for Day (top row) and Week (bottom row).\nLines represent different Disinformant levels. Time is in simulation hours.",
+  theme = theme(plot.title = element_text(size = 16, face = "bold"),
+                plot.subtitle = element_text(size = 12))
+)
+
+# Display the combined plot
+print(combined_plot)
+
+# Optional: Save the combined figure
+ggsave(
+  "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/HUHHH_combined_believers_plot.png",
+  combined_plot,
+  width = 20,
+  height = 12,
+  dpi = 300
+)
+
+# Create empty lists to store plots
+day_plots <- list()
+week_plots <- list()
+
+valences <- sort(unique(long_data$Valence))
+
+for (v in valences) {
+  day_plots[[paste0("Day_Valence_", v)]] <- plot_tall_valence(long_data, "Day", v)
+  week_plots[[paste0("Week_Valence_", v)]] <- plot_tall_valence(long_data, "Week", v)
+}
+
+combined_plot <- (
+  day_plots$Day_Valence_1 + day_plots$Day_Valence_5 + day_plots$Day_Valence_10 +
+  week_plots$Week_Valence_1 + week_plots$Week_Valence_5 + week_plots$Week_Valence_10
+) + 
+  plot_layout(ncol = 3, nrow = 2, guides = "collect") & 
+  theme(legend.position = "bottom")
+
+print(combined_plot)
+# Save the combined plot
+ggsave(
+  "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/cool_combined_believers_plot.png",
+  combined_plot,
+  width = 20,
+  height = 12,
+  dpi = 300
+)
+
+```
+
+```{r}
+# --- Get global Y-axis limits ---
+y_limits <- range(long_data$Believer, na.rm = TRUE)
+scale_y_continuous(limits = c(0, 5))
+
+# --- Plotting Function with Fixed Y-Axis Limits ---
+plot_tall_valence <- function(data, time_type, valence_value, y_limits) {
+  ggplot(
+    filter(data, TimeType == time_type, Valence == valence_value),
+    aes(x = Time_num, y = Believer, color = factor(Disinformants))
+  ) +
+    geom_line(alpha = 0.1, size = 0.3) +  # Faint individual lines
+    stat_summary(fun = mean, geom = "line", size = 2, aes(group = Disinformants)) +
+    scale_color_manual(values = disinformant_colors) +
+    scale_y_continuous(limits = y_limits) +  # Apply shared y-axis
+    labs(
+      title = paste0("Believers Over Time (", time_type, " Simulations), Valence = ", valence_value),
+      subtitle = "Faint lines: Individual replicates | Bold lines: Mean trend",
+      x = "Time (Hours)",
+      y = "Believers",
+      color = "Disinformants"
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(
+      legend.position = "bottom",
+      plot.margin = margin(1, 1, 1, 1, "cm"),
+      axis.text = element_text(size = 12),
+      axis.title = element_text(size = 14)
+    )
+}
+
+# --- Generate All 6 Plots with Consistent Y-Axis ---
+valences <- sort(unique(long_data$Valence))
+
+day_plots <- list()
+week_plots <- list()
+
+for (v in valences) {
+  day_plots[[paste0("Day_Valence_", v)]] <- plot_tall_valence(long_data, "Day", v, y_limits)
+  week_plots[[paste0("Week_Valence_", v)]] <- plot_tall_valence(long_data, "Week", v, y_limits)
+}
+
+# --- Combine All 6 Plots into One Layout ---
+combined_plot <- (
+  day_plots$Day_Valence_1 + day_plots$Day_Valence_5 + day_plots$Day_Valence_10 +
+  week_plots$Week_Valence_1 + week_plots$Week_Valence_5 + week_plots$Week_Valence_10
+) +
+  plot_layout(ncol = 3, nrow = 2, guides = "collect") &
+  theme(legend.position = "bottom")
+
+# --- Add Caption/Title ---
+combined_plot <- combined_plot + plot_annotation(
+  title = "Figure: Believers Over Time by Valence and Time Granularity",
+  subtitle = "Each panel shows simulation results by Valence level (1, 5, 10) for Day (top row) and Week (bottom row).\nLines represent different Disinformant levels. Time is in simulation hours.",
+  theme = theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+)
+
+# --- Save the Combined Plot ---
+ggsave(
+  "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/coolio_combined_believers_plot.png",
+  combined_plot,
+  width = 20,
+  height = 12,
+  dpi = 300
+)
+
+# --- Show the Combined Plot in Console ---
+print(combined_plot)
+```
+
+```{r}
+# --- Hardcoded Y-axis limits ---
+y_limits <- c(0, 5)
+
+# --- Plotting Function with Fixed Y-Axis Limits ---
+plot_tall_valence <- function(data, time_type, valence_value, y_limits) {
+  ggplot(
+    filter(data, TimeType == time_type, Valence == valence_value),
+    aes(x = Time_num, y = Believer, color = factor(Disinformants))
+  ) +
+    #geom_line(alpha = 0.1, size = 0.3) +  # Faint individual lines
+    stat_summary(fun = mean, geom = "line", size = 2, aes(group = Disinformants)) +
+    scale_color_manual(values = disinformant_colors) +
+    scale_y_continuous(limits = y_limits) +  # Fixed y-axis
+    labs(
+      title = paste0("Believers Over Time (", time_type, " Simulations), Valence = ", valence_value),
+      subtitle = "Faint lines: Individual replicates | Bold lines: Mean trend",
+      x = "Time (Hours)",
+      y = "Believers",
+      color = "Disinformants"
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(
+      legend.position = "bottom",
+      plot.margin = margin(1, 1, 1, 1, "cm"),
+      axis.text = element_text(size = 12),
+      axis.title = element_text(size = 14)
+    )
+}
+
+# --- Generate All 6 Plots with Fixed Y-Axis ---
+valences <- sort(unique(long_data$Valence))
+
+day_plots <- list()
+week_plots <- list()
+
+for (v in valences) {
+  day_plots[[paste0("Day_Valence_", v)]] <- plot_tall_valence(long_data, "Day", v, y_limits)
+  week_plots[[paste0("Week_Valence_", v)]] <- plot_tall_valence(long_data, "Week", v, y_limits)
+}
+
+# --- Combine All 6 Plots into One Layout ---
+combined_plot <- (
+  day_plots$Day_Valence_1 + day_plots$Day_Valence_5 + day_plots$Day_Valence_10 +
+  week_plots$Week_Valence_1 + week_plots$Week_Valence_5 + week_plots$Week_Valence_10
+) +
+  plot_layout(ncol = 3, nrow = 2, guides = "collect") &
+  theme(legend.position = "bottom")
+
+# --- Add Caption/Title ---
+combined_plot <- combined_plot + plot_annotation(
+  title = "Figure: Believers Over Time by Valence and Time Granularity",
+  subtitle = "Each panel shows simulation results by Valence level (1, 5, 10) for Day (top row) and Week (bottom row).\nLines represent different Disinformant levels. Time is in simulation hours.",
+  theme = theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+)
+
+# --- Save the Combined Plot ---
+ggsave(
+  "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/cool43_combined_believers_plot.png",
+  combined_plot,
+  width = 20,
+  height = 12,
+  dpi = 300
+)
+
+# --- Display the Plot in Console ---
+print(combined_plot)
+```
+
+# best
+```{r}
+# --- Determine Maximum Mean Believer Value Across All Conditions ---
+max_mean <- long_data %>%
+  group_by(TimeType, Valence, Disinformants, Time_num) %>%
+  summarise(mean_believers = mean(Believer, na.rm = TRUE), .groups = "drop") %>%
+  pull(mean_believers) %>%
+  max(na.rm = TRUE)
+
+# --- Round Up for Clean Axis Limit ---
+y_max <- ceiling(max_mean * 1.1)  # 10% buffer
+y_limits <- c(0, y_max)
+
+plot_tall_valence <- function(data, time_type, valence_value, y_limits) {
+  ggplot(
+    filter(data, TimeType == time_type, Valence == valence_value),
+    aes(x = Time_num, y = Believer, color = factor(Disinformants))
+  ) +
+    stat_summary(fun = mean, geom = "line", size = 2, aes(group = Disinformants)) +
+    scale_color_manual(values = disinformant_colors) +
+    scale_y_continuous(limits = y_limits) +  # Dynamic but consistent
+    labs(
+      title = paste0("Believers Over Time (", time_type, " Simulations), Valence = ", valence_value),
+      subtitle = "Faint lines: Individual replicates | Bold lines: Mean trend",
+      x = "Time (Hours)",
+      y = "Believers",
+      color = "Disinformants"
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(
+      legend.position = "bottom",
+      plot.margin = margin(1, 1, 1, 1, "cm"),
+      axis.text = element_text(size = 12),
+      axis.title = element_text(size = 14)
+    )
+}
+
+
+# --- Generate All 6 Plots with Fixed Y-Axis ---
+valences <- sort(unique(long_data$Valence))
+
+day_plots <- list()
+week_plots <- list()
+
+for (v in valences) {
+  day_plots[[paste0("Day_Valence_", v)]] <- plot_tall_valence(long_data, "Day", v, y_limits)
+  week_plots[[paste0("Week_Valence_", v)]] <- plot_tall_valence(long_data, "Week", v, y_limits)
+}
+
+# --- Combine All 6 Plots into One Layout ---
+combined_plot <- (
+  day_plots$Day_Valence_1 + day_plots$Day_Valence_5 + day_plots$Day_Valence_10 +
+  week_plots$Week_Valence_1 + week_plots$Week_Valence_5 + week_plots$Week_Valence_10
+) +
+  plot_layout(ncol = 3, nrow = 2, guides = "collect") &
+  theme(legend.position = "bottom")
+
+# --- Add Caption/Title ---
+combined_plot <- combined_plot + plot_annotation(
+  title = "Figure: Believers Over Time by Valence and Time Granularity",
+  subtitle = "Each panel shows simulation results by Valence level (1, 5, 10) for Day (top row) and Week (bottom row).\nLines represent different Disinformant levels. Time is in simulation hours.",
+  theme = theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+)
+
+# --- Save the Combined Plot ---
+ggsave(
+  "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/cool45_combined_believers_plot.png",
+  combined_plot,
+  width = 20,
+  height = 12,
+  dpi = 300
+)
+
+# --- Display the Plot in Console ---
+print(combined_plot)
+
+```
+
+# percentage better:
+```{r}
+metadata <- tribble(
+  ~TimeType, ~Disinformants, ~Sus_Doubt, ~Valence, ~Filename,
+  "Day", 1, "15-14", 1, "RQ1_1_1a",
+  "Day", 1, "15-14", 5, "RQ1_1_5a",
+  "Day", 1, "15-14", 10, "RQ1_1_10a",
+  "Day", 2, "14-14", 1, "RQ1_2_1a",
+  "Day", 2, "14-14", 5, "RQ1_2_5a",
+  "Day", 2, "14-14", 10, "RQ1_2_10a",
+  "Day", 3, "14-13", 1, "RQ1_3_1a",
+  "Day", 3, "14-13", 5, "RQ1_3_5a",
+  "Day", 3, "14-13", 10, "RQ1_3_10a",
+  "Day", 4, "13-13", 1, "RQ1_4_1a",
+  "Day", 4, "13-13", 5, "RQ1_4_5a",
+  "Day", 4, "13-13", 10, "RQ1_4_10a",
+  "Day", 5, "13-12", 1, "RQ1_5_1a",
+  "Day", 5, "13-12", 5, "RQ1_5_5a",
+  "Day", 5, "13-12", 10, "RQ1_5_10a",
+  "Week", 1, "15-14", 1, "RQ1_1_1b",
+  "Week", 1, "15-14", 5, "RQ1_1_5b",
+  "Week", 1, "15-14", 10, "RQ1_1_10b",
+  "Week", 2, "14-14", 1, "RQ1_2_1b",
+  "Week", 2, "14-14", 5, "RQ1_2_5b",
+  "Week", 2, "14-14", 10, "RQ1_2_10b",
+  "Week", 3, "14-13", 1, "RQ1_3_1b",
+  "Week", 3, "14-13", 5, "RQ1_3_5b",
+  "Week", 3, "14-13", 10, "RQ1_3_10b",
+  "Week", 4, "13-13", 1, "RQ1_4_1b",
+  "Week", 4, "13-13", 5, "RQ1_4_5b",
+  "Week", 4, "13-13", 10, "RQ1_4_10b",
+  "Week", 5, "13-12", 1, "RQ1_5_1b",
+  "Week", 5, "13-12", 5, "RQ1_5_5b",
+  "Week", 5, "13-12", 10, "RQ1_5_10b"
+)
+
+head(long_data)
+
+metadata <- metadata %>%
+  separate(Sus_Doubt, into = c("Susceptibles", "Doubters"), sep = "-", convert = TRUE) %>%
+  mutate(
+    Population = Susceptibles + Doubters + Disinformants,
+    Disinfo_pct = Disinformants / Population
+  )
+
+
+# Create additional metadata (e.g. change suffix)
+additional_metadata <- metadata %>%
+  mutate(Filename = str_replace(Filename, "[a-z]$", function(x) {
+    case_when(
+      x == "a" ~ "b",
+      x == "b" ~ "c",
+      TRUE ~ x
+    )
+  }))
+
+# Combine
+metadata <- bind_rows(metadata, additional_metadata)
+
+long_data <- long_data %>%
+  left_join(metadata, by = c("file" = "Filename")) %>%
+  mutate(
+    Time_num = as.numeric(substr(Time, 1, 2)) + as.numeric(substr(Time, 4, 5)) / 60
+  )
+
+library(ggplot2)
+library(scales)
+library(dplyr)
+
+plot_valence_exposure <- function(data, y_max = 1) {
+  ggplot(
+    data,
+    aes(x = Time_num, y = Believer_pct, color = factor(Disinfo_pct))
+  ) +
+    stat_summary(
+      fun = mean,
+      geom = "line",
+      size = 1.2,
+      aes(group = Disinfo_pct)
+    ) +
+    stat_summary(
+      fun.data = mean_cl_normal,
+      geom = "ribbon",
+      aes(group = Disinfo_pct, fill = factor(Disinfo_pct)),
+      alpha = 0.15,
+      color = NA
+    ) +
+    geom_hline(
+      yintercept = 0.5,
+      linetype = "dashed",
+      color = "red",
+      linewidth = 0.8
+    ) +
+    annotate(
+      "text",
+      x = max(data$Time_num) * 0.02,
+      y = 0.52,
+      label = "50% Conversion Threshold",
+      hjust = 0,
+      size = 4,
+      color = "red"
+    ) +
+    scale_y_continuous(
+      labels = percent_format(accuracy = 1),
+      limits = c(0, y_max),
+      expand = expansion(mult = c(0.01, 0.05))
+    ) +
+    scale_color_viridis_d(name = "Disinformants (%)") +
+    scale_fill_viridis_d(name = "Disinformants (%)") +
+    facet_grid(Valence ~ TimeType, labeller = label_both) +
+    labs(
+      title = "Population Belief Conversion Over Time",
+      subtitle = "Faceted by Emotional Valence and Exposure Granularity (Day vs Week)",
+      x = "Time (Simulation Hours)",
+      y = "Believers (% of Population)"
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(
+      legend.position = "bottom",
+      legend.title = element_text(size = 12),
+      legend.text = element_text(size = 10),
+      plot.title = element_text(face = "bold", size = 16),
+      plot.subtitle = element_text(size = 12),
+      strip.text = element_text(size = 12),
+      axis.text = element_text(size = 11)
+    )
+}
+
+```
+```{r}
+library(tidyverse)
+library(readr)
+library(lubridate)
+library(scales)
+library(viridisLite) 
+
+# --- Step 1: Define Metadata ---
+metadata <- tribble(
+  ~TimeType, ~Disinformants, ~Sus_Doubt, ~Valence, ~Filename,
+  "Day", 1, "15-14", 1, "RQ1_1_1a",
+  "Day", 1, "15-14", 5, "RQ1_1_5a",
+  "Day", 1, "15-14", 10, "RQ1_1_10a",
+  "Day", 2, "14-14", 1, "RQ1_2_1a",
+  "Day", 2, "14-14", 5, "RQ1_2_5a",
+  "Day", 2, "14-14", 10, "RQ1_2_10a",
+  "Day", 3, "14-13", 1, "RQ1_3_1a",
+  "Day", 3, "14-13", 5, "RQ1_3_5a",
+  "Day", 3, "14-13", 10, "RQ1_3_10a",
+  "Day", 4, "13-13", 1, "RQ1_4_1a",
+  "Day", 4, "13-13", 5, "RQ1_4_5a",
+  "Day", 4, "13-13", 10, "RQ1_4_10a",
+  "Day", 5, "13-12", 1, "RQ1_5_1a",
+  "Day", 5, "13-12", 5, "RQ1_5_5a",
+  "Day", 5, "13-12", 10, "RQ1_5_10a",
+  "Week", 1, "15-14", 1, "RQ1_1_1b",
+  "Week", 1, "15-14", 5, "RQ1_1_5b",
+  "Week", 1, "15-14", 10, "RQ1_1_10b",
+  "Week", 2, "14-14", 1, "RQ1_2_1b",
+  "Week", 2, "14-14", 5, "RQ1_2_5b",
+  "Week", 2, "14-14", 10, "RQ1_2_10b",
+  "Week", 3, "14-13", 1, "RQ1_3_1b",
+  "Week", 3, "14-13", 5, "RQ1_3_5b",
+  "Week", 3, "14-13", 10, "RQ1_3_10b",
+  "Week", 4, "13-13", 1, "RQ1_4_1b",
+  "Week", 4, "13-13", 5, "RQ1_4_5b",
+  "Week", 4, "13-13", 10, "RQ1_4_10b",
+  "Week", 5, "13-12", 1, "RQ1_5_1b",
+  "Week", 5, "13-12", 5, "RQ1_5_5b",
+  "Week", 5, "13-12", 10, "RQ1_5_10b"
+)
+
+# --- Step 2: Separate Sus_Doubt into numeric columns and compute population ---
+metadata <- metadata %>%
+  separate(Sus_Doubt, into = c("Susceptibles", "Doubters"), sep = "-", convert = TRUE) %>%
+  mutate(
+    Population = Susceptibles + Doubters + Disinformants,
+    Disinfo_pct = Disinformants / Population * 100
+  )
+
+# --- Step 3: Create additional metadata variants (e.g., change suffix a->b->c) ---
+additional_metadata <- metadata %>%
+  mutate(Filename = str_replace(Filename, "[a-z]$", function(x) {
+    case_when(
+      x == "a" ~ "b",
+      x == "b" ~ "c",
+      x == "c" ~ "d",
+      TRUE ~ x
+    )
+  }))
+
+metadata <- bind_rows(metadata, additional_metadata)
+
+# --- Step 4: Read all data files ---
+path <- "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ1"
+files <- list.files(path, pattern = "\\.csv$", full.names = TRUE)
+
+long_data <- map_dfr(files, function(f) {
+  df <- read_csv(f, show_col_types = FALSE)
+  base_name <- tools::file_path_sans_ext(basename(f)) %>%
+    str_replace("_(\\d{8}_\\d{6})$", "") # Remove trailing timestamp if exists
+  df$base_file <- base_name
+  df
+})
+
+# --- Step 5: Join long_data with metadata by base_file = Filename ---
+long_data <- long_data %>%
+  left_join(metadata, by = c("base_file" = "Filename"))
+
+# Check for unmatched files (optional)
+unmatched <- long_data %>%
+  filter(is.na(TimeType)) %>%
+  distinct(base_file)
+if (nrow(unmatched) > 0) {
+  warning("Some files not matched in metadata:\n", paste(unmatched$base_file, collapse = ", "))
+}
+
+# --- Step 6: Convert Time to numeric hours (assuming Time is character or hms) ---
+long_data <- long_data %>%
+  mutate(
+    Time_num = as.numeric(hms::as_hms(Time)) / 3600  # convert hms to seconds, then to hours
+  )
+
+# --- Step 7: Calculate Believer percentage ---
+long_data <- long_data %>%
+  mutate(
+    Believer_pct = Believer / Population
+  )
+
+# --- Step 8: Define plotting function ---
+plot_valence_exposure <- function(data, y_max = 1) {
+  ggplot(
+    data,
+    aes(x = Time_num, y = Believer_pct, color = factor(round(Disinfo_pct)))
+  ) +
+    stat_summary(
+      fun = mean,
+      geom = "line",
+      size = 1.2,
+      aes(group = factor(round(Disinfo_pct)))
+    ) +
+    stat_summary(
+      fun.data = mean_cl_normal,
+      geom = "ribbon",
+      aes(group = factor(round(Disinfo_pct)), fill = factor(round(Disinfo_pct))),
+      alpha = 0.15,
+      color = NA
+    ) +
+    geom_hline(
+      yintercept = 0.5,
+      linetype = "dashed",
+      color = "red",
+      linewidth = 0.8
+    ) +
+    annotate(
+      "text",
+      x = max(data$Time_num, na.rm = TRUE) * 0.02,
+      y = 0.52,
+      label = "50% Conversion Threshold",
+      hjust = 0,
+      size = 4,
+      color = "red"
+    ) +
+    scale_y_continuous(
+      labels = scales::percent_format(accuracy = 1),
+      limits = c(0, y_max),
+      expand = expansion(mult = c(0.01, 0.05))
+    ) +
+    scale_color_manual(values = viridis::viridis(n_distinct(data$Disinfo_pct))) +
+    scale_fill_manual(values = viridis::viridis(n_distinct(data$Disinfo_pct))) +
+    facet_grid(Valence ~ TimeType, labeller = label_both) +
+    labs(
+      title = "Population Belief Conversion Over Time",
+      subtitle = "Faceted by Emotional Valence and Exposure Granularity (Day vs Week)",
+      x = "Time (Simulation Hours)",
+      y = "Believers (% of Population)"
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(
+      legend.position = "bottom",
+      legend.title = element_text(size = 12),
+      legend.text = element_text(size = 10),
+      plot.title = element_text(face = "bold", size = 16),
+      plot.subtitle = element_text(size = 12),
+      strip.text = element_text(size = 12),
+      axis.text = element_text(size = 11)
+    )
+}
+
+# --- Step 9: Example usage of plotting function ---
+p <- plot_valence_exposure(filter(long_data, TimeType == "Day"))
+
+ggsave(
+  filename = "belief_conversion_over_time_day.png",
+  plot = p,
+  path = "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/",
+  width = 10, height = 6,
+  dpi = 300
+)
+
+```
+
+# Percentage RQ3
+```{r}
+# --- Set Fixed Y-Axis Limits for Percentages ---
+y_limits <- c(0, 3)  # 0% to 100%
+
+# --- Generate All 6 Plots (Percent-Based) ---
+valences <- sort(unique(long_data$Valence))
+
+day_plots <- list()
+week_plots <- list()
+
+for (v in valences) {
+  day_plots[[paste0("Day_Valence_", v)]] <- plot_tall_valence(long_data, "Day", v, y_limits)
+  week_plots[[paste0("Week_Valence_", v)]] <- plot_tall_valence(long_data, "Week", v, y_limits)
+}
+
+# --- Combine All 6 Plots ---
+combined_plot <- (
+  day_plots$Day_Valence_1 + day_plots$Day_Valence_5 + day_plots$Day_Valence_10 +
+  week_plots$Week_Valence_1 + week_plots$Week_Valence_5 + week_plots$Week_Valence_10
+) +
+  plot_layout(ncol = 3, nrow = 2, guides = "collect") &
+  theme(legend.position = "bottom")
+
+# --- Add Title and Subtitle ---
+combined_plot <- combined_plot + plot_annotation(
+  title = "Figure: Percentage of Believers Over Time by Valence and Disinformants",
+  subtitle = "Each panel shows % Believers over time by Valence (1, 5, 10) and Time Granularity (Day vs Week).\nLine color reflects % Disinformants in the population.",
+  theme = theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+)
+
+# --- Save the Plot ---
+ggsave(
+  filename = "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/percent_believers_plot.png",
+  plot = combined_plot,
+  width = 20,
+  height = 12,
+  dpi = 300
+)
+
+# --- Optional: Display in Console ---
+print(combined_plot)
+
+```
+
+```{r}
+
+# Add summary statistics for the last combined plot
+cat("\n=== SUMMARY STATISTICS FOR COMBINED PLOT ===\n")
+
+# Get summary stats by TimeType (Day/Week) and Valence
+summary_stats <- long_data %>%
+  group_by(TimeType, Valence) %>%
+  summarise(
+    Mean_Believer = mean(Believer, na.rm = TRUE),
+    SD_Believer = sd(Believer, na.rm = TRUE),
+    Median_Believer = median(Believer, na.rm = TRUE),
+    Min_Believer = min(Believer, na.rm = TRUE),
+    Max_Believer = max(Believer, na.rm = TRUE),
+    N_Simulations = n(),  # Using simple count of rows per group
+    .groups = 'drop'
+  )
+
+# Additional breakdown by Disinformants
+disinformant_stats <- long_data %>%
+  group_by(TimeType, Valence, Disinformants) %>%
+  summarise(
+    Mean_Believer = mean(Believer, na.rm = TRUE),
+    SD_Believer = sd(Believer, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+# Print results
+cat("\n--- Main Summary Statistics ---\n")
+print(summary_stats, n = Inf)
+
+cat("\n--- Breakdown by Disinformants ---\n")
+print(disinformant_stats, n = Inf)
+
+# Store results
+combined_plot_summary <- list(
+  overall_stats = summary_stats,
+  disinformant_stats = disinformant_stats
+)
+
+# Use write.csv() instead of write_csv() if needed
+write.csv(summary_stats, "summary_stats.csv", row.names = FALSE)
+
+```
+
+
+# RQ2 (CH & RF)
+```{r}
+library(tidyverse)
+library(lubridate)
+
+# --- Metadata for Hypothesis 2 base filenames ---
+hyp2_metadata <- tibble(
+  Valence = 1:10,
+  Disinformants = 1,
+  BaseFilename = paste0("RQ2_", 1:10, "_1")
+)
+
+# --- Step 1: List all files matching the pattern for Hypothesis 2 ---
+path <- "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ2"
+all_files <- list.files(path, pattern = "^RQ2_\\d+_1.*\\.csv$", full.names = TRUE)
+
+# --- Step 2: Extract base filenames to match metadata ---
+# Remove timestamp suffixes, keep only base filename
+get_base_filename <- function(file_path) {
+  file_name <- basename(file_path)
+  # Extract up to first underscore + digits + underscore + digits (the base)
+  # RQ2_1_1 or RQ2_1_1_20250518_120212 -> RQ2_1_1
+  str_extract(file_name, "^RQ2_\\d+_1")
+}
+
+file_base_map <- tibble(
+  full_path = all_files,
+  base_file = map_chr(all_files, get_base_filename)
+)
+
+# --- Step 3: Filter files that have base filename in hyp2_metadata ---
+files_to_load <- file_base_map %>%
+  filter(base_file %in% hyp2_metadata$BaseFilename)
+
+# --- Step 4: Load and combine all files, annotate with base filename metadata ---
+hyp2_data <- map_dfr(files_to_load$full_path, function(f) {
+  df <- read_csv(f, show_col_types = FALSE)
+  df$file <- basename(f)
+  df$base_file <- get_base_filename(f)
+  df
+}) %>%
+  left_join(hyp2_metadata, by = c("base_file" = "BaseFilename")) %>%
+  mutate(Time_num = hour(Time) + minute(Time)/60 + second(Time)/3600)
+
+# --- Step 5: Aggregate by base filename and time (average Believer across versions) ---
+agg_hyp2 <- hyp2_data %>%
+  group_by(Valence, Disinformants, Time_num) %>%
+  summarise(
+    Believer_mean = mean(Believer, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# --- Step 6: Plot average Believer fraction over time by Valence ---
+p <- ggplot(agg_hyp2, aes(x = Time_num, y = Believer_mean, color = factor(Valence))) +
+  geom_line(size = 1.2) +
+  labs(
+    title = "Average Believer Fraction Over Day 1 by Emotional Valence (α)",
+    x = "Time (Hours)",
+    y = "Average Believer Fraction",
+    color = "Emotional Valence (α)"
+  ) +
+  theme_minimal() +
+  xlim(0, 24) +
+  geom_hline(yintercept = 0.1, linetype = "dashed", color = "red") +
+  annotate("text", x = 20, y = 0.11, label = "10% Believer Threshold", color = "red")
+
+print(p)
+
+# --- Step 7: Identify α where average Believer fraction > 10% at last time point ---
+penetration_df <- agg_hyp2 %>%
+  filter(Time_num == max(Time_num)) %>%
+  arrange(Valence) %>%
+  select(Valence, Believer_mean)
+
+penetration_alpha <- penetration_df %>%
+  filter(Believer_mean > 0.10) %>%
+  slice_head(n = 1) %>%
+  pull(Valence)
+
+cat("Minimum α where average believers exceed 10% at day 1:", penetration_alpha, "\n")
+print(penetration_df)
+
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+
+# --- Step 1: Filter day 1 data only (assuming Time_num is in hours, so max 24 hours) ---
+day1_data <- hyp2_data %>%
+  filter(Time_num <= 24)
+
+# --- Step 2: For each Disinformants-Valence combo, find earliest Time_num where Believer > 10% (0.1) ---
+summary_table <- day1_data %>%
+  filter(Believer >= 3) %>%
+  group_by(Disinformants, Valence) %>%
+  summarise(
+    First_Time_Above_10pct = min(Time_num, na.rm = TRUE),
+    Max_Believer = max(Believer, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  complete(Disinformants, Valence) %>%  # fill in combos with no exceedance
+  arrange(Disinformants, Valence)
+
+# Replace NAs in First_Time_Above_10pct with NA_real_ (meaning never reached 10%)
+summary_table$First_Time_Above_10pct[is.infinite(summary_table$First_Time_Above_10pct)] <- NA_real_
+
+print(summary_table)
+
+```
+
+
+```{r}
+library(tidyverse)
+library(lubridate)
+
+# --- Metadata for Hypothesis 2 (both 1 and 2 disinformants) ---
+# Assuming 10 α values (Valence = 1:10) for both disinformant counts
+hyp2_metadata <- tibble(
+  Valence = rep(1:10, 2),
+  Disinformants = rep(c(1, 2), each = 10),
+  BaseFilename = c(
+    paste0("RQ2_", 1:10, "_1"),  # for 1 disinformant
+    paste0("RQ2_", 1:10, "_2")   # for 2 disinformants
+  )
+)
+
+# --- Step 1: List all files matching the pattern for Hypothesis 2 ---
+path <- "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ2"
+all_files <- list.files(path, pattern = "^RQ2_\\d+_[12].*\\.csv$", full.names = TRUE)
+
+# --- Step 2: Extract base filenames ---
+get_base_filename <- function(file_path) {
+  file_name <- basename(file_path)
+  str_extract(file_name, "^RQ2_\\d+_[12]")
+}
+
+file_base_map <- tibble(
+  full_path = all_files,
+  base_file = map_chr(all_files, get_base_filename)
+)
+
+# --- Step 3: Filter files that have base filename in hyp2_metadata ---
+files_to_load <- file_base_map %>%
+  filter(base_file %in% hyp2_metadata$BaseFilename)
+
+# --- Step 4: Load and combine files ---
+hyp2_data <- map_dfr(files_to_load$full_path, function(f) {
+  df <- read_csv(f, show_col_types = FALSE)
+  df$file <- basename(f)
+  df$base_file <- get_base_filename(f)
+  df
+}) %>%
+  left_join(hyp2_metadata, by = c("base_file" = "BaseFilename")) %>%
+  mutate(Time_num = hour(Time) + minute(Time)/60 + second(Time)/3600)
+
+# --- Step 5: Aggregate mean Believer fraction per group ---
+agg_hyp2 <- hyp2_data %>%
+  group_by(Valence, Disinformants, Time_num) %>%
+  summarise(
+    Believer_mean = mean(Believer, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# --- Step 6: Plot with facet by Disinformants ---
+p <- ggplot(agg_hyp2, aes(x = Time_num, y = Believer_mean, color = factor(Valence))) +
+  geom_line(size = 1.2) +
+  facet_wrap(~ Disinformants, labeller = labeller(Disinformants = c("1" = "1 Disinformant", "2" = "2 Disinformants"))) +
+  labs(
+    title = "Average Believer Fraction Over Day 1 by Emotional Valence (α) and Disinformants",
+    x = "Time (Hours)",
+    y = "Average Believer Fraction",
+    color = "Emotional Valence (α)"
+  ) +
+  theme_minimal()
+print(p)
+
+# --- Step 7: Identify α per Disinformant count where believers > 10% ---
+penetration_df <- agg_hyp2 %>%
+  filter(Time_num == max(Time_num)) %>%
+  arrange(Disinformants, Valence) %>%
+  select(Disinformants, Valence, Believer_mean)
+
+penetration_alpha <- penetration_df %>%
+  group_by(Disinformants) %>%
+  slice_head(n = 1) %>%
+  ungroup()
+
+cat("Minimum α values where believers exceed 10% at day 1:\n")
+print(penetration_alpha)
+
+```
+
+# Better plot (CH)
+
+```{r}
+library(ggplot2)
+library(viridis)
+
+# Improved plot
+p_improved <- ggplot(agg_hyp2, aes(x = Time_num, y = Believer_mean, color = factor(Valence))) +
+  geom_line(size = 1.2, alpha = 0.9) +
+  scale_color_viridis_c(name = expression(alpha~"(Emotional Valence)")) +
+  labs(
+    title = "Believer Influenced by Emotional Valence (α)",
+    subtitle = "Average believer fraction over 24 hours (1 doubter group per α)",
+    x = "Time (Hours)",
+    y = "Average Believer Fraction"
+  ) +
+  scale_x_continuous(limits = c(0, 24), breaks = seq(0, 24, by = 4)) +
+  scale_y_continuous(limits = c(0, max(agg_hyp2$Believer_mean, na.rm = TRUE) * 1.1)) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13, margin = margin(b = 10)),
+    axis.title = element_text(size = 13),
+    plot.margin = margin(1, 1, 1, 1, "cm")
+  )
+
+print(p_improved)
+
+
+# Save plot to PNG
+ggsave(
+  filename = "rq2.png",  # change path if needed
+  plot = p_improved,
+  width = 12, height = 8, dpi = 300
+)
+
+```
+# RQ3 (CH)
+
+```{r}
+
+library(tidyverse)
+library(lubridate)
+library(readr)
+library(ggplot2)
+library(viridis)
+
+# --- Paths for Day and Week simulations ---
+paths <- list(
+  Day = "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ3/Day",
+  Week = "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ3/Week"
+)
+
+# --- Load and combine RQ3 data from both folders ---
+load_rq3_data <- function(path, time_type) {
+  files <- list.files(path, pattern = "\\.csv$", full.names = TRUE)
+  data <- map_dfr(files, function(f) {
+    df <- read_csv(f, show_col_types = FALSE)
+    df$file <- basename(f)
+    df$TimeType <- time_type
+    df
+  })
+  return(data)
+}
+
+# Load both time types
+rq3_day <- load_rq3_data(paths$Day, "Day")
+rq3_week <- load_rq3_data(paths$Week, "Week")
+
+# Combine into one dataframe
+rq3_data <- bind_rows(rq3_day, rq3_week) %>%
+  mutate(
+    Time_num = hour(Time) + minute(Time)/60 + second(Time)/3600,
+    PopMix = paste0(Susceptible, "S_", Doubter, "D")
+  )
+
+# --- Aggregate believers over time by population mix ---
+agg_rq3 <- rq3_data %>%
+  group_by(TimeType, PopMix, Time_num) %>%
+  summarise(
+    Believer_mean = mean(Believer, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# --- Plot function ---
+plot_rq3_retention <- function(data, time_type) {
+  ggplot(filter(data, TimeType == time_type),
+         aes(x = Time_num, y = Believer_mean, color = PopMix)) +
+    geom_line(size = 1.2, alpha = 0.9) +
+    scale_color_viridis_c(option = "D", name = "Population Mix") +
+    labs(
+      title = paste("Misinformation Retention by Susceptible–Doubter Mix (", time_type, ")", sep = ""),
+      subtitle = "Average number of believers over time for different group compositions",
+      x = "Time (Hours)",
+      y = "Average Believer Count"
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(
+      legend.position = "right",
+      plot.title = element_text(face = "bold", size = 16),
+      plot.subtitle = element_text(size = 12, margin = margin(b = 10)),
+      axis.title = element_text(size = 13),
+      legend.title = element_text(size = 12),
+      legend.text = element_text(size = 10),
+      plot.margin = margin(1, 1, 1, 1, "cm")
+    ) +
+    scale_x_continuous(limits = c(0, ifelse(time_type == "Day", 24, 168)), breaks = seq(0, ifelse(time_type == "Day", 24, 168), by = ifelse(time_type == "Day", 4, 24)))
+}
+
+# --- Plot both Day and Week retention curves ---
+plot_rq3_day <- plot_rq3_retention(agg_rq3, "Day")
+plot_rq3_week <- plot_rq3_retention(agg_rq3, "Week")
+
+print(plot_rq3_day)
+print(plot_rq3_week)
+
+```
+```{r}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+
+# --- Paths for RQ3 ---
+rq3_day_path <- "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ3/Day"
+rq3_week_path <- "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ3/Week"
+
+# --- Load CSV files ---
+load_rq3_files <- function(path) {
+  files <- list.files(path, pattern = "\\.csv$", full.names = TRUE)
+  map_dfr(files, ~ read_csv(.x, show_col_types = FALSE))
+}
+
+rq3_day <- load_rq3_files(rq3_day_path) %>% mutate(TimeType = "Day")
+rq3_week <- load_rq3_files(rq3_week_path) %>% mutate(TimeType = "Week")
+
+# --- Combine and preprocess data ---
+rq3_data <- bind_rows(rq3_day, rq3_week) %>%
+  mutate(
+    Time_num = hour(Time) + minute(Time)/60 + second(Time)/3600,
+    PopMix = factor(paste0(Susceptible, "S_", Doubter, "D"))  # FIXED & FACTORED
+  )
+
+# --- Aggregated plot of Believers over time ---
+plot_rq3 <- ggplot(rq3_data, aes(x = Time_num, y = Believer, color = PopMix)) +
+  stat_summary(fun = mean, geom = "line", size = 1.2) +
+  facet_wrap(~ TimeType, ncol = 1) +
+  labs(
+    title = "Believer Retention Over Time by Susceptible-Doubter Mix",
+    subtitle = "Each line represents a unique mix of susceptible and doubter agents",
+    x = "Time (Hours)",
+    y = "Average Number of Believers",
+    color = "Population Mix"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    strip.text = element_text(size = 13, face = "bold"),
+    plot.margin = margin(1, 1, 1, 1, "cm")
+  ) +
+  guides(color = guide_legend(nrow = 3, byrow = TRUE))
+
+# --- Save as PNG ---
+ggsave("RQ3_Believer_Retention.png", plot_rq3, width = 14, height = 20, dpi = 300)
+
+# --- Display plot ---
+print(plot_rq3)
+
+```
+
+Separation of day and week + grouped by ratio
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(tibble)
+
+rq3_meta <- tribble(
+  ~Time, ~alpha, ~Ratio, ~SUS, ~Doubt, ~Filename,
+  "day", 1, "1-9", 3, 26, "RQ3_1_9_1a",
+  "day", 1, "2-8", 6, 23, "RQ3_2_8_1a",
+  "day", 1, "3-7", 9, 20, "RQ3_3_7_1a",
+  "day", 1, "4-6", 12, 17, "RQ3_4_6_1a",
+  "day", 1, "5-5", 15, 14, "RQ3_5_5_1a",
+  "day", 1, "6-4", 17, 12, "RQ3_6_4_1a",
+  "day", 1, "7-3", 20, 9,  "RQ3_7_3_1a",
+  "day", 1, "8-2", 23, 6,  "RQ3_8_2_1a",
+  "day", 1, "9-1", 26, 3,  "RQ3_9_1_1a",
+  
+  "day", 5, "1-9", 3, 26, "RQ3_1_9_5a",
+  "day", 5, "2-8", 6, 23, "RQ3_2_8_5a",
+  "day", 5, "3-7", 9, 20, "RQ3_3_7_5a",
+  "day", 5, "4-6", 12, 17, "RQ3_4_6_5a",
+  "day", 5, "5-5", 15, 14, "RQ3_5_5_5a",
+  "day", 5, "6-4", 17, 12, "RQ3_6_4_5a",
+  "day", 5, "7-3", 20, 9,  "RQ3_7_3_5a",
+  "day", 5, "8-2", 23, 6,  "RQ3_8_2_5a",
+  "day", 5, "9-1", 26, 3,  "RQ3_9_1_5a",
+  
+  "day", 10, "1-9", 3, 26, "RQ3_1_9_10a",
+  "day", 10, "2-8", 6, 23, "RQ3_2_8_10a",
+  "day", 10, "3-7", 9, 20, "RQ3_3_7_10a",
+  "day", 10, "4-6", 12, 17, "RQ3_4_6_10a",
+  "day", 10, "5-5", 15, 14, "RQ3_5_5_10a",
+  "day", 10, "6-4", 17, 12, "RQ3_6_4_10a",
+  "day", 10, "7-3", 20, 9,  "RQ3_7_3_10a",
+  "day", 10, "8-2", 23, 6,  "RQ3_8_2_10a",
+  "day", 10, "9-1", 26, 3,  "RQ3_9_1_10a",
+  
+  "week", 1, "1-9", 3, 26, "RQ3_1_9_1b",
+  "week", 1, "2-8", 6, 23, "RQ3_2_8_1b",
+  "week", 1, "3-7", 9, 20, "RQ3_3_7_1b",
+  "week", 1, "4-6", 12, 17, "RQ3_4_6_1b",
+  "week", 1, "5-5", 15, 14, "RQ3_5_5_1b",
+  "week", 1, "6-4", 17, 12, "RQ3_6_4_1b",
+  "week", 1, "7-3", 20, 9,  "RQ3_7_3_1b",
+  "week", 1, "8-2", 23, 6,  "RQ3_8_2_1b",
+  "week", 1, "9-1", 26, 3,  "RQ3_9_1_1b",
+  
+  "week", 5, "1-9", 3, 26, "RQ3_1_9_5b",
+  "week", 5, "2-8", 6, 23, "RQ3_2_8_5b",
+  "week", 5, "3-7", 9, 20, "RQ3_3_7_5b",
+  "week", 5, "4-6", 12, 17, "RQ3_4_6_5b",
+  "week", 5, "5-5", 15, 14, "RQ3_5_5_5b",
+  "week", 5, "6-4", 17, 12, "RQ3_6_4_5b",
+  "week", 5, "7-3", 20, 9,  "RQ3_7_3_5b",
+  "week", 5, "8-2", 23, 6,  "RQ3_8_2_5b",
+  "week", 5, "9-1", 26, 3,  "RQ3_9_1_5b",
+  
+  "week", 10, "1-9", 3, 26, "RQ3_1_9_10b",
+  "week", 10, "2-8", 6, 23, "RQ3_2_8_10b",
+  "week", 10, "3-7", 9, 20, "RQ3_3_7_10b",
+  "week", 10, "4-6", 12, 17, "RQ3_4_6_10b",
+  "week", 10, "5-5", 15, 14, "RQ3_5_5_10b",
+  "week", 10, "6-4", 17, 12, "RQ3_6_4_10b",
+  "week", 10, "7-3", 20, 9,  "RQ3_7_3_10b",
+  "week", 10, "8-2", 23, 6,  "RQ3_8_2_10b",
+  "week", 10, "9-1", 26, 3,  "RQ3_9_1_10b"
+)
+
+# --- Load your data (assuming already loaded as rq3_day and rq3_week) ---
+# Add a TimeType column to each:
+rq3_day <- rq3_day %>% mutate(Time = "day")
+rq3_week <- rq3_week %>% mutate(Time = "week")
+
+# Combine data:
+rq3_all <- bind_rows(rq3_day, rq3_week)
+
+# --- Join metadata ---
+rq3_all <- rq3_all %>%
+  left_join(rq3_meta, by = c("Time", "alpha", "Filename"))
+
+# --- Check join worked ---
+stopifnot(!any(is.na(rq3_all$Ratio)))
+
+# --- Process time ---
+rq3_all <- rq3_all %>%
+  mutate(Time_num = hour(Time) + minute(Time)/60 + second(Time)/3600)
+
+# --- Aggregate mean and sd by Time, alpha, Ratio, Time_num ---
+agg_rq3 <- rq3_all %>%
+  group_by(Time, alpha, Ratio, Time_num) %>%
+  summarise(
+    Believer_mean = mean(Believer, na.rm = TRUE),
+    Believer_sd = sd(Believer, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# --- Plot helper ---
+plot_rq3_ratio <- function(data, time_type) {
+  plot_data <- filter(data, Time == time_type)
+  
+  ggplot(plot_data, aes(x = Time_num, y = Believer_mean, color = Ratio)) +
+    geom_ribbon(aes(ymin = pmax(Believer_mean - Believer_sd, 0), ymax = Believer_mean + Believer_sd, fill = Ratio), alpha = 0.15, color = NA) +
+    geom_line(size = 1.1) +
+    facet_wrap(~alpha, scales = "free_y", ncol = 2) +
+    scale_color_viridis_c(option = "inferno") +
+    scale_fill_viridis_c(option = "inferno") +
+    labs(
+      title = paste(toupper(time_type), "Simulation: Believer Fraction by Susceptible-Doubter Ratio and α"),
+      x = "Time (Hours)",
+      y = "Average Believer Fraction",
+      color = "Susceptible-Doubter Ratio",
+      fill = "Susceptible-Doubter Ratio"
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(legend.position = "bottom")
+}
+
+# --- Plot and save Day and Week ---
+p_day <- plot_rq3_ratio(agg_rq3, "day")
+p_week <- plot_rq3_ratio(agg_rq3, "week")
+
+ggsave("RQ3_Day_Ratio_Believer.png", p_day, width = 14, height = 10, dpi = 300)
+ggsave("RQ3_Week_Ratio_Believer.png", p_week, width = 14, height = 10, dpi = 300)
+
+print(p_day)
+print(p_week)
+
+```
+Summary
+```{r}
+library(dplyr)
+
+summary_table <- agg_rq3 %>%
+  group_by(Time, alpha, Ratio) %>%
+  summarise(
+    Max_Believer = max(Believer_mean, na.rm = TRUE),
+    Time_at_Max = Time_num[which.max(Believer_mean)],
+    Mean_Believer = mean(Believer_mean, na.rm = TRUE),
+    Final_Believer = Believer_mean[which.max(Time_num)],  # last time point's believer fraction
+    .groups = "drop"
+  ) %>%
+  arrange(Time, alpha, Ratio)
+
+# View in R console
+print(summary_table)
+
+# Save to CSV for further inspection / reporting
+#write.csv(summary_table, "RQ3_Believer_Summary.csv", row.names = FALSE)
+
+library(knitr)
+
+kable(summary_table, caption = "Summary of Believer Fractions by Time, α and Susceptible:Doubter Ratio")
+
+```
+
+```{r}
+library(tidyverse)
+
+# Your full rq3_meta data
+rq3_meta <- tribble(
+  ~Time, ~alpha, ~Ratio, ~SUS, ~Doubt, ~Filename,
+  "day", 1, "1-9", 3, 26, "RQ3_1_9_1a",
+  "day", 1, "2-8", 6, 23, "RQ3_2_8_1a",
+  "day", 1, "3-7", 9, 20, "RQ3_3_7_1a",
+  "day", 1, "4-6", 12, 17, "RQ3_4_6_1a",
+  "day", 1, "5-5", 15, 14, "RQ3_5_5_1a",
+  "day", 1, "6-4", 17, 12, "RQ3_6_4_1a",
+  "day", 1, "7-3", 20, 9,  "RQ3_7_3_1a",
+  "day", 1, "8-2", 23, 6,  "RQ3_8_2_1a",
+  "day", 1, "9-1", 26, 3,  "RQ3_9_1_1a",
+  
+  "day", 5, "1-9", 3, 26, "RQ3_1_9_5a",
+  "day", 5, "2-8", 6, 23, "RQ3_2_8_5a",
+  "day", 5, "3-7", 9, 20, "RQ3_3_7_5a",
+  "day", 5, "4-6", 12, 17, "RQ3_4_6_5a",
+  "day", 5, "5-5", 15, 14, "RQ3_5_5_5a",
+  "day", 5, "6-4", 17, 12, "RQ3_6_4_5a",
+  "day", 5, "7-3", 20, 9,  "RQ3_7_3_5a",
+  "day", 5, "8-2", 23, 6,  "RQ3_8_2_5a",
+  "day", 5, "9-1", 26, 3,  "RQ3_9_1_5a",
+  
+  "day", 10, "1-9", 3, 26, "RQ3_1_9_10a",
+  "day", 10, "2-8", 6, 23, "RQ3_2_8_10a",
+  "day", 10, "3-7", 9, 20, "RQ3_3_7_10a",
+  "day", 10, "4-6", 12, 17, "RQ3_4_6_10a",
+  "day", 10, "5-5", 15, 14, "RQ3_5_5_10a",
+  "day", 10, "6-4", 17, 12, "RQ3_6_4_10a",
+  "day", 10, "7-3", 20, 9,  "RQ3_7_3_10a",
+  "day", 10, "8-2", 23, 6,  "RQ3_8_2_10a",
+  "day", 10, "9-1", 26, 3,  "RQ3_9_1_10a",
+  
+  "week", 1, "1-9", 3, 26, "RQ3_1_9_1b",
+  "week", 1, "2-8", 6, 23, "RQ3_2_8_1b",
+  "week", 1, "3-7", 9, 20, "RQ3_3_7_1b",
+  "week", 1, "4-6", 12, 17, "RQ3_4_6_1b",
+  "week", 1, "5-5", 15, 14, "RQ3_5_5_1b",
+  "week", 1, "6-4", 17, 12, "RQ3_6_4_1b",
+  "week", 1, "7-3", 20, 9,  "RQ3_7_3_1b",
+  "week", 1, "8-2", 23, 6,  "RQ3_8_2_1b",
+  "week", 1, "9-1", 26, 3,  "RQ3_9_1_1b",
+  
+  "week", 5, "1-9", 3, 26, "RQ3_1_9_5b",
+  "week", 5, "2-8", 6, 23, "RQ3_2_8_5b",
+  "week", 5, "3-7", 9, 20, "RQ3_3_7_5b",
+  "week", 5, "4-6", 12, 17, "RQ3_4_6_5b",
+  "week", 5, "5-5", 15, 14, "RQ3_5_5_5b",
+  "week", 5, "6-4", 17, 12, "RQ3_6_4_5b",
+  "week", 5, "7-3", 20, 9,  "RQ3_7_3_5b",
+  "week", 5, "8-2", 23, 6,  "RQ3_8_2_5b",
+  "week", 5, "9-1", 26, 3,  "RQ3_9_1_5b",
+  
+  "week", 10, "1-9", 3, 26, "RQ3_1_9_10b",
+  "week", 10, "2-8", 6, 23, "RQ3_2_8_10b",
+  "week", 10, "3-7", 9, 20, "RQ3_3_7_10b",
+  "week", 10, "4-6", 12, 17, "RQ3_4_6_10b",
+  "week", 10, "5-5", 15, 14, "RQ3_5_5_10b",
+  "week", 10, "6-4", 17, 12, "RQ3_6_4_10b",
+  "week", 10, "7-3", 20, 9,  "RQ3_7_3_10b",
+  "week", 10, "8-2", 23, 6,  "RQ3_8_2_10b",
+  "week", 10, "9-1", 26, 3,  "RQ3_9_1_10b"
+)
+
+# Separate by Time and group by Ratio, summarize mean SUS and Doubt
+rq3_summary <- rq3_meta %>%
+  group_by(Time, Ratio) %>%
+  summarise(
+    mean_SUS = mean(SUS),
+    mean_Doubt = mean(Doubt),
+    .groups = "drop"
+  )
+
+print(rq3_summary)
+
+# If you want to just split into day/week groups as tibbles:
+rq3_day <- rq3_meta %>% filter(Time == "day")
+rq3_week <- rq3_meta %>% filter(Time == "week")
+
+print(rq3_day)
+print(rq3_week)
+
+# Save summary table as CSV
+write_csv(rq3_summary, "rq3_summary.csv")
+
+# Save separated tables as CSV
+write_csv(rq3_meta %>% filter(Time == "day"), "rq3_day.csv")
+write_csv(rq3_meta %>% filter(Time == "week"), "rq3_week.csv")
+
+```
+
+```{r}
+
+library(tidyverse)
+library(lubridate)
+library(viridis)
+glimpse(rq3_all)
+summary(rq3_all$Time)
+
+# Load and preprocess data
+paths <- list(
+  Day = "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ3/Day",
+  Week = "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ3/Week"
+)
+
+load_rq3_data <- function(path, time_type) {
+  list.files(path, pattern = "\\.csv$", full.names = TRUE) %>% 
+    map_dfr(~ {
+      read_csv(.x, show_col_types = FALSE) %>% 
+        mutate(
+          TimeType = time_type,
+          Filename = basename(.x),
+          Time_num = hour(Time) + minute(Time)/60 + second(Time)/3600
+        )
+    })
+}
+
+
+rq3_all <- bind_rows(
+  load_rq3_data(paths$Day, "day"),
+  load_rq3_data(paths$Week, "week")
+) %>% 
+  mutate(
+    # Extract ratio from filename (e.g., "RQ3_1_9_1a" -> "1-9")
+    Ratio = str_extract(Filename, "(?<=RQ3_)\\d+_\\d+(?=_)") %>% str_replace("_", "-"),
+    Time_num = hour(Time) + minute(Time)/60 + second(Time)/3600
+  )
+
+# Aggregate data (average over alpha)
+agg_rq3 <- rq3_all %>% 
+  group_by(TimeType, Ratio, Time_num) %>% 
+  summarise(
+    Believer_mean = mean(Believer, na.rm = TRUE),
+    Believer_sd = sd(Believer, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Plotting function
+plot_ratio_retention <- function(data, time_type) {
+  filtered_data <- filter(data, TimeType == time_type)
+  time_max <- ifelse(time_type == "day", 24, 168)
+  
+  ggplot(filtered_data, aes(x = Time_num, y = Believer_mean, color = Ratio)) +
+    geom_ribbon(
+      aes(ymin = pmax(Believer_mean - Believer_sd, 0), 
+          ymax = Believer_mean + Believer_sd, 
+          fill = Ratio),
+      alpha = 0.15, color = NA
+    ) +
+    geom_line(size = 1.1) +
+    scale_color_viridis_d(option = "inferno") +
+    scale_fill_viridis_d(option = "inferno") +
+    labs(title = paste(str_to_title(time_type), "Simulation: Believer Retention by Ratio", subtitle = "Averaged over emotional valence (α = 1, 5, 10)", x = "Time (Hours)", y = "Average Believer Count")) +
+    scale_x_continuous(limits = c(0, time_max), breaks = seq(0, time_max, 4)) +
+    theme_minimal() +
+    theme(legend.position = "bottom", plot.title = element_text(face = "bold"))
+}
+
+# Generate and save plots
+p_day <- plot_ratio_retention(agg_rq3, "day")
+p_week <- plot_ratio_retention(agg_rq3, "week")
+
+ggsave("RQ3_Day_Ratios.png", p_day, width = 10, height = 6, dpi = 300)
+ggsave("RQ3_Week_Ratios.png", p_week, width = 10, height = 6, dpi = 300)
+
+# Summary table for key time points
+summary_table <- agg_rq3 %>%
+  mutate(Time_num_rounded = round(Time_num)) %>%
+  filter(Time_num_rounded %in% c(24, 168)) %>%
+  group_by(TimeType, Ratio, Time_num_rounded) %>%
+  summarise(Avg_Believers = mean(Believer_mean, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = Time_num_rounded, values_from = Avg_Believers,
+              names_prefix = "Believers_") %>%
+  rename(`Avg Believers (24h)` = Believers_24,
+         `Avg Believers (7d)` = Believers_168)
+
+```
+```{r}
+library(tidyverse)
+
+# Paths to data folders
+paths <- list(
+  day = "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ3/Day",
+  week = "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ3/Week"
+)
+
+# Provided metadata
+rq3_meta <- tribble(
+  ~Time, ~alpha, ~Ratio, ~SUS, ~Doubt, ~Filename,
+  "day", 1, "1-9", 3, 26, "RQ3_1_9_1a",
+  "day", 1, "2-8", 6, 23, "RQ3_2_8_1a",
+  "day", 1, "3-7", 9, 20, "RQ3_3_7_1a",
+  "day", 1, "4-6", 12, 17, "RQ3_4_6_1a",
+  "day", 1, "5-5", 15, 14, "RQ3_5_5_1a",
+  "day", 1, "6-4", 17, 12, "RQ3_6_4_1a",
+  "day", 1, "7-3", 20, 9,  "RQ3_7_3_1a",
+  "day", 1, "8-2", 23, 6,  "RQ3_8_2_1a",
+  "day", 1, "9-1", 26, 3,  "RQ3_9_1_1a",
+  
+  "day", 5, "1-9", 3, 26, "RQ3_1_9_5a",
+  "day", 5, "2-8", 6, 23, "RQ3_2_8_5a",
+  "day", 5, "3-7", 9, 20, "RQ3_3_7_5a",
+  "day", 5, "4-6", 12, 17, "RQ3_4_6_5a",
+  "day", 5, "5-5", 15, 14, "RQ3_5_5_5a",
+  "day", 5, "6-4", 17, 12, "RQ3_6_4_5a",
+  "day", 5, "7-3", 20, 9,  "RQ3_7_3_5a",
+  "day", 5, "8-2", 23, 6,  "RQ3_8_2_5a",
+  "day", 5, "9-1", 26, 3,  "RQ3_9_1_5a",
+  
+  "day", 10, "1-9", 3, 26, "RQ3_1_9_10a",
+  "day", 10, "2-8", 6, 23, "RQ3_2_8_10a",
+  "day", 10, "3-7", 9, 20, "RQ3_3_7_10a",
+  "day", 10, "4-6", 12, 17, "RQ3_4_6_10a",
+  "day", 10, "5-5", 15, 14, "RQ3_5_5_10a",
+  "day", 10, "6-4", 17, 12, "RQ3_6_4_10a",
+  "day", 10, "7-3", 20, 9,  "RQ3_7_3_10a",
+  "day", 10, "8-2", 23, 6,  "RQ3_8_2_10a",
+  "day", 10, "9-1", 26, 3,  "RQ3_9_1_10a",
+  
+  "week", 1, "1-9", 3, 26, "RQ3_1_9_1b",
+  "week", 1, "2-8", 6, 23, "RQ3_2_8_1b",
+  "week", 1, "3-7", 9, 20, "RQ3_3_7_1b",
+  "week", 1, "4-6", 12, 17, "RQ3_4_6_1b",
+  "week", 1, "5-5", 15, 14, "RQ3_5_5_1b",
+  "week", 1, "6-4", 17, 12, "RQ3_6_4_1b",
+  "week", 1, "7-3", 20, 9,  "RQ3_7_3_1b",
+  "week", 1, "8-2", 23, 6,  "RQ3_8_2_1b",
+  "week", 1, "9-1", 26, 3,  "RQ3_9_1_1b",
+  
+  "week", 5, "1-9", 3, 26, "RQ3_1_9_5b",
+  "week", 5, "2-8", 6, 23, "RQ3_2_8_5b",
+  "week", 5, "3-7", 9, 20, "RQ3_3_7_5b",
+  "week", 5, "4-6", 12, 17, "RQ3_4_6_5b",
+  "week", 5, "5-5", 15, 14, "RQ3_5_5_5b",
+  "week", 5, "6-4", 17, 12, "RQ3_6_4_5b",
+  "week", 5, "7-3", 20, 9,  "RQ3_7_3_5b",
+  "week", 5, "8-2", 23, 6,  "RQ3_8_2_5b",
+  "week", 5, "9-1", 26, 3,  "RQ3_9_1_5b",
+  
+  "week", 10, "1-9", 3, 26, "RQ3_1_9_10b",
+  "week", 10, "2-8", 6, 23, "RQ3_2_8_10b",
+  "week", 10, "3-7", 9, 20, "RQ3_3_7_10b",
+  "week", 10, "4-6", 12, 17, "RQ3_4_6_10b",
+  "week", 10, "5-5", 15, 14, "RQ3_5_5_10b",
+  "week", 10, "6-4", 17, 12, "RQ3_6_4_10b",
+  "week", 10, "7-3", 20, 9,  "RQ3_7_3_10b",
+  "week", 10, "8-2", 23, 6,  "RQ3_8_2_10b",
+  "week", 10, "9-1", 26, 3,  "RQ3_9_1_10b"
+)
+
+# Load and combine all CSVs
+df_list <- rq3_meta %>%
+  mutate(
+    folder = tolower(Time),
+    path = file.path(paths[[1]][folder], paste0(Filename, ".csv"))
+  ) %>%
+  rowwise() %>%
+  mutate(data = list(read_csv(path))) %>%
+  unnest(cols = c(data))
+
+# Merge with metadata
+df_full <- df_list %>%
+  left_join(rq3_meta, by = "Filename")
+
+# --------------------------------------
+# Check & Clean Data
+# --------------------------------------
+
+# Convert Time (day/week) to factor
+df_full$Time <- factor(df_full$Time, levels = c("day", "week"))
+
+# Convert 'alpha' to numeric Time value
+df_full$alpha <- as.numeric(df_full$alpha)
+
+# --------------------------------------
+# Aggregate: Mean percentages per Ratio per time point
+# --------------------------------------
+
+
+# Pivot longer for easier plotting
+df_long <- df_full %>%
+  pivot_longer(cols = c(Believer, Doubter, Uncertain),
+               names_to = "Group",
+               values_to = "Mean")
+
+# --------------------------------------
+# Plot: Group Means Over Time
+# --------------------------------------
+
+ggplot(df_long, aes(x = alpha, y = Mean, color = Group)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  geom_smooth(se = FALSE, method = "loess", linetype = "dashed") +
+  facet_wrap(~Time + Ratio, ncol = 3) +
+  labs(
+    title = "Group Trends Over Time by SUS-Doubt Ratio",
+    x = "Time (alpha value)",
+    y = "Mean Percentage",
+    color = "Group"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+```
+```{r}
+library(tidyverse)
+
+# Paths to data folders
+paths <- list(
+  day = "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ3/Day",
+  week = "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ3/Week"
+)
+
+# Your rq3_meta table (you’ve already provided this — include full version here)
+# Provided metadata
+rq3_meta <- tribble(
+  ~Time, ~alpha, ~Ratio, ~SUS, ~Doubt, ~Filename,
+  "day", 1, "1-9", 3, 26, "RQ3_1_9_1a",
+  "day", 1, "2-8", 6, 23, "RQ3_2_8_1a",
+  "day", 1, "3-7", 9, 20, "RQ3_3_7_1a",
+  "day", 1, "4-6", 12, 17, "RQ3_4_6_1a",
+  "day", 1, "5-5", 15, 14, "RQ3_5_5_1a",
+  "day", 1, "6-4", 17, 12, "RQ3_6_4_1a",
+  "day", 1, "7-3", 20, 9,  "RQ3_7_3_1a",
+  "day", 1, "8-2", 23, 6,  "RQ3_8_2_1a",
+  "day", 1, "9-1", 26, 3,  "RQ3_9_1_1a",
+  
+  "day", 5, "1-9", 3, 26, "RQ3_1_9_5a",
+  "day", 5, "2-8", 6, 23, "RQ3_2_8_5a",
+  "day", 5, "3-7", 9, 20, "RQ3_3_7_5a",
+  "day", 5, "4-6", 12, 17, "RQ3_4_6_5a",
+  "day", 5, "5-5", 15, 14, "RQ3_5_5_5a",
+  "day", 5, "6-4", 17, 12, "RQ3_6_4_5a",
+  "day", 5, "7-3", 20, 9,  "RQ3_7_3_5a",
+  "day", 5, "8-2", 23, 6,  "RQ3_8_2_5a",
+  "day", 5, "9-1", 26, 3,  "RQ3_9_1_5a",
+  
+  "day", 10, "1-9", 3, 26, "RQ3_1_9_10a",
+  "day", 10, "2-8", 6, 23, "RQ3_2_8_10a",
+  "day", 10, "3-7", 9, 20, "RQ3_3_7_10a",
+  "day", 10, "4-6", 12, 17, "RQ3_4_6_10a",
+  "day", 10, "5-5", 15, 14, "RQ3_5_5_10a",
+  "day", 10, "6-4", 17, 12, "RQ3_6_4_10a",
+  "day", 10, "7-3", 20, 9,  "RQ3_7_3_10a",
+  "day", 10, "8-2", 23, 6,  "RQ3_8_2_10a",
+  "day", 10, "9-1", 26, 3,  "RQ3_9_1_10a",
+  
+  "week", 1, "1-9", 3, 26, "RQ3_1_9_1b",
+  "week", 1, "2-8", 6, 23, "RQ3_2_8_1b",
+  "week", 1, "3-7", 9, 20, "RQ3_3_7_1b",
+  "week", 1, "4-6", 12, 17, "RQ3_4_6_1b",
+  "week", 1, "5-5", 15, 14, "RQ3_5_5_1b",
+  "week", 1, "6-4", 17, 12, "RQ3_6_4_1b",
+  "week", 1, "7-3", 20, 9,  "RQ3_7_3_1b",
+  "week", 1, "8-2", 23, 6,  "RQ3_8_2_1b",
+  "week", 1, "9-1", 26, 3,  "RQ3_9_1_1b",
+  
+  "week", 5, "1-9", 3, 26, "RQ3_1_9_5b",
+  "week", 5, "2-8", 6, 23, "RQ3_2_8_5b",
+  "week", 5, "3-7", 9, 20, "RQ3_3_7_5b",
+  "week", 5, "4-6", 12, 17, "RQ3_4_6_5b",
+  "week", 5, "5-5", 15, 14, "RQ3_5_5_5b",
+  "week", 5, "6-4", 17, 12, "RQ3_6_4_5b",
+  "week", 5, "7-3", 20, 9,  "RQ3_7_3_5b",
+  "week", 5, "8-2", 23, 6,  "RQ3_8_2_5b",
+  "week", 5, "9-1", 26, 3,  "RQ3_9_1_5b",
+  
+  "week", 10, "1-9", 3, 26, "RQ3_1_9_10b",
+  "week", 10, "2-8", 6, 23, "RQ3_2_8_10b",
+  "week", 10, "3-7", 9, 20, "RQ3_3_7_10b",
+  "week", 10, "4-6", 12, 17, "RQ3_4_6_10b",
+  "week", 10, "5-5", 15, 14, "RQ3_5_5_10b",
+  "week", 10, "6-4", 17, 12, "RQ3_6_4_10b",
+  "week", 10, "7-3", 20, 9,  "RQ3_7_3_10b",
+  "week", 10, "8-2", 23, 6,  "RQ3_8_2_10b",
+  "week", 10, "9-1", 26, 3,  "RQ3_9_1_10b"
+)
+# ------------------------------------------------
+# Load and combine all data files
+# ------------------------------------------------
+
+# Load and bind CSVs using meta
+df_combined <- rq3_meta %>%
+  mutate(
+    folder = tolower(Time),
+    full_path = file.path(paths[[1]][folder], paste0(Filename, ".csv"))
+  ) %>%
+  rowwise() %>%
+  mutate(
+    data = list(read_csv(full_path, show_col_types = FALSE) %>%
+                  mutate(Filename = Filename))  # Attach filename to each row
+  ) %>%
+  unnest(data) %>%
+  ungroup()
+
+# ------------------------------------------------
+# Merge with metadata
+# ------------------------------------------------
+
+df_full <- df_combined %>%
+  left_join(rq3_meta, by = "Filename")
+
+# ------------------------------------------------
+# Summarise actual group % from CSVs
+# ------------------------------------------------
+
+# Compute proportions based on population in each CSV (row-wise)
+df_percentages <- df_full %>%
+  mutate(
+    Total = Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant,
+    Believer_Perc = Believer / Total * 100,
+    Doubter_Perc = Doubter / Total * 100,
+    Uncertain_Perc = (Susceptible + Exposed) / Total * 100
+  ) %>%
+  select(Filename, Time, alpha, Ratio, Believer_Perc, Doubter_Perc, Uncertain_Perc)
+
+# Average percentages per file
+df_summary <- df_percentages %>%
+  group_by(Filename, Time, alpha, Ratio) %>%
+  summarise(
+    Believer = mean(Believer_Perc, na.rm = TRUE),
+    Doubter = mean(Doubter_Perc, na.rm = TRUE),
+    Uncertain = mean(Uncertain_Perc, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Reshape for plotting
+df_long <- df_summary %>%
+  pivot_longer(
+    cols = c(Believer, Doubter, Uncertain),
+    names_to = "Group",
+    values_to = "Mean"
+  )
+
+# ------------------------------------------------
+# Plot: Group Mean Trends Over Time
+# ------------------------------------------------
+
+ggplot(df_long, aes(x = factor(alpha), y = Mean, group = Group, color = Group)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  facet_wrap(~Time + Ratio, ncol = 3) +
+  labs(
+    title = "Group Proportions Over Time by SUS-Doubt Ratio",
+    x = "Alpha",
+    y = "Mean % of Population",
+    color = "Group"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+```
+
+rq3 retry
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+
+# Define paths to data folders
+paths <- list(
+  day = "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ3/Day",
+  week = "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ3/Week"
+)
+
+# Provided metadata
+rq3_meta <- tribble(
+  ~Time, ~alpha, ~Ratio, ~SUS, ~Doubt, ~Filename,
+  "day", 1, "1-9", 3, 26, "RQ3_1_9_1a",
+  "day", 1, "2-8", 6, 23, "RQ3_2_8_1a",
+  "day", 1, "3-7", 9, 20, "RQ3_3_7_1a",
+  "day", 1, "4-6", 12, 17, "RQ3_4_6_1a",
+  "day", 1, "5-5", 15, 14, "RQ3_5_5_1a",
+  "day", 1, "6-4", 17, 12, "RQ3_6_4_1a",
+  "day", 1, "7-3", 20, 9,  "RQ3_7_3_1a",
+  "day", 1, "8-2", 23, 6,  "RQ3_8_2_1a",
+  "day", 1, "9-1", 26, 3,  "RQ3_9_1_1a",
+  
+  "day", 5, "1-9", 3, 26, "RQ3_1_9_5a",
+  "day", 5, "2-8", 6, 23, "RQ3_2_8_5a",
+  "day", 5, "3-7", 9, 20, "RQ3_3_7_5a",
+  "day", 5, "4-6", 12, 17, "RQ3_4_6_5a",
+  "day", 5, "5-5", 15, 14, "RQ3_5_5_5a",
+  "day", 5, "6-4", 17, 12, "RQ3_6_4_5a",
+  "day", 5, "7-3", 20, 9,  "RQ3_7_3_5a",
+  "day", 5, "8-2", 23, 6,  "RQ3_8_2_5a",
+  "day", 5, "9-1", 26, 3,  "RQ3_9_1_5a",
+  
+  "day", 10, "1-9", 3, 26, "RQ3_1_9_10a",
+  "day", 10, "2-8", 6, 23, "RQ3_2_8_10a",
+  "day", 10, "3-7", 9, 20, "RQ3_3_7_10a",
+  "day", 10, "4-6", 12, 17, "RQ3_4_6_10a",
+  "day", 10, "5-5", 15, 14, "RQ3_5_5_10a",
+  "day", 10, "6-4", 17, 12, "RQ3_6_4_10a",
+  "day", 10, "7-3", 20, 9,  "RQ3_7_3_10a",
+  "day", 10, "9-1", 26, 3,  "RQ3_9_1_10a",
+  
+  "week", 1, "1-9", 3, 26, "RQ3_1_9_1b",
+  "week", 1, "2-8", 6, 23, "RQ3_2_8_1b",
+  "week", 1, "3-7", 9, 20, "RQ3_3_7_1b",
+  "week", 1, "4-6", 12, 17, "RQ3_4_6_1b",
+  "week", 1, "5-5", 15, 14, "RQ3_5_5_1b",
+  "week", 1, "6-4", 17, 12, "RQ3_6_4_1b",
+  "week", 1, "7-3", 20, 9,  "RQ3_7_3_1b",
+  "week", 1, "8-2", 23, 6,  "RQ3_8_2_1b",
+  "week", 1, "9-1", 26, 3,  "RQ3_9_1_1b",
+  
+  "week", 5, "1-9", 3, 26, "RQ3_1_9_5b",
+  "week", 5, "2-8", 6, 23, "RQ3_2_8_5b",
+  "week", 5, "3-7", 9, 20, "RQ3_3_7_5b",
+  "week", 5, "4-6", 12, 17, "RQ3_4_6_5b",
+  "week", 5, "5-5", 15, 14, "RQ3_5_5_5b",
+  "week", 5, "6-4", 17, 12, "RQ3_6_4_5b",
+  "week", 5, "7-3", 20, 9,  "RQ3_7_3_5b",
+  "week", 5, "8-2", 23, 6,  "RQ3_8_2_5b",
+  "week", 5, "9-1", 26, 3,  "RQ3_9_1_5b",
+  
+  "week", 10, "1-9", 3, 26, "RQ3_1_9_10b",
+  "week", 10, "2-8", 6, 23, "RQ3_2_8_10b",
+  "week", 10, "3-7", 9, 20, "RQ3_3_7_10b",
+  "week", 10, "4-6", 12, 17, "RQ3_4_6_10b",
+  "week", 10, "5-5", 15, 14, "RQ3_5_5_10b",
+  "week", 10, "6-4", 17, 12, "RQ3_6_4_10b",
+  "week", 10, "7-3", 20, 9,  "RQ3_7_3_10b",
+  "week", 10, "8-2", 23, 6,  "RQ3_8_2_10b",
+  "week", 10, "9-1", 26, 3,  "RQ3_9_1_10b"
+)
+
+# Process metadata and read data files
+processed_data <- rq3_meta %>%
+  separate(Ratio, into = c("S_part", "D_part"), sep = "-", convert = TRUE) %>%
+  mutate(S_percent = S_part / (S_part + D_part) * 100) %>%
+  mutate(file_path = ifelse(Time == "day",
+                           file.path(paths$day, paste0(Filename, ".csv")),
+                           file.path(paths$week, paste0(Filename, ".csv")))) %>%
+  mutate(data = map(file_path, ~read_csv(.x) %>%
+                      select(-Time) %>%   # Remove Time from nested data to avoid clash
+                      mutate(t = row_number()))) %>%
+  unnest(data) %>%
+  group_by(Time, Ratio, S_percent, t) %>%
+  summarise(Believers_mean = mean(Believers), .groups = "drop")
+
+
+# Create plot
+ggplot(processed_data, aes(x = t, y = Believers_mean, color = S_percent)) +
+  geom_line(linewidth = 0.8) +
+  facet_wrap(~Time, ncol = 1, scales = "free_y") +
+  scale_color_gradientn(
+    colors = c("#4575b4", "#91bfdb", "#e0f3f8", "#fee090", "#fc8d59", "#d73027"),
+    name = "Susceptible Proportion (%)",
+    breaks = seq(10, 90, by = 20)
+  ) +
+  labs(
+    x = "Time Step",
+    y = "Average Number of Believers",
+    title = "Effect of Population Composition on Misinformation Retention",
+    subtitle = "Averaged across α levels (1, 5, 10) with fixed Disinformant count (n=1)",
+    caption = "Higher susceptible proportions accelerate initial spread but doubters improve long-term correction"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold", size = 12),
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
+```
+
+
+
+
+
+
+

@@ -1,0 +1,423 @@
+---
+title: "rq3"
+author: "Clara Holst"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+Read all files from here: D:\UNI\4th Semester\Social and Cultural Dynamics\Misinformation\Data\
+
+Research question here: Day: "D:\UNI\4th Semester\Social and Cultural Dynamics\Misinformation\Data\RQ3\Day" & Week: "D:\UNI\4th Semester\Social and Cultural Dynamics\Misinformation\Data\RQ3\Week"
+
+Filenames:
+RQ3_<sus><doubt><α><timepoint>
+
+sus-doubt: Ratio of susceptible to doubter agents
+
+α: Influence strength (1, 5, 10)
+
+a = day-level measurements
+
+b = week-level measurements
+(e.g., 1a = day 1; 10b = week 10)
+
+Variables:
+Day,Time,Susceptible,Exposed,Believer,Doubter,Recovered,Disinformant,Total_Misinformed
+
+```{r}
+
+library(tidyverse)
+library(stringr)
+
+summarize_file <- function(file_path, time_type) {
+  df <- read_csv(file_path, show_col_types = FALSE)
+  fname <- basename(file_path)
+  
+  # Match filenames like RQ3_1_9_1a.csv
+  parts <- str_match(fname, "RQ3_(\\d+)_(\\d+)_(\\d+)([ab])")
+  if (any(is.na(parts))) {
+    warning(paste("Skipping file due to filename mismatch:", fname))
+    return(NULL)
+  }
+  
+  sus <- as.integer(parts[2])
+  doubt <- as.integer(parts[3])
+  alpha <- as.integer(parts[4])
+  label <- parts[5]
+  
+  # Get last day's value
+  last_day <- max(df$Day, na.rm = TRUE)
+  last_df <- df %>% filter(Day == last_day)
+  
+  # Convert to consistent time measure (day for a, week*7 for b)
+  time_day <- ifelse(label == "a", last_day, last_day * 7)
+  
+  last_df %>%
+    summarise(
+      Mean_Believer = mean(Believer, na.rm = TRUE)
+    ) %>%
+    mutate(
+      Time = time_day,
+      Alpha = alpha,
+      Sus = sus,
+      Doubt = doubt,
+      Ratio = paste0(sus, "-", doubt),
+      TimeType = time_type,
+      Filename = fname
+    )
+}
+
+day_files <- list.files("D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ3/Day", full.names = TRUE)
+week_files <- list.files("D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ3/Week", full.names = TRUE)
+
+# Map and combine
+all_summaries <- bind_rows(
+  map(day_files, ~ summarize_file(.x, "Day")),
+  map(week_files, ~ summarize_file(.x, "Week"))
+)
+
+```
+
+```{r}
+library(ggplot2)
+
+# Plot: Believers over Time grouped by alpha
+p <- ggplot(all_summaries, aes(x = Time, y = Mean_Believer, color = factor(Alpha))) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", se = FALSE, linetype = "dashed") +
+  labs(
+    title = "Misinformation Retention Over Time",
+    subtitle = "Believer % across Susceptible-Doubter Ratios and Influence Levels",
+    x = "Time (Days)",
+    y = "Mean Number of Believers",
+    color = "Influence (α)"
+  ) +
+  theme_minimal(base_size = 14)
+
+# Save to PNG
+ggsave("RQ3_Believers_Over_Time.png", plot = p, width = 10, height = 6, dpi = 300)
+
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+ggplot(all_summaries, aes(x = factor(Alpha), y = Mean_Believer, group = Ratio, color = Ratio)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 3) +
+  facet_wrap(~ TimeType) +
+  labs(
+    title = "Mean % Believers over Influence Strength by Ratio",
+    x = "Influence Strength (α)",
+    y = "Mean % Believers",
+    color = "Susceptible:Doubter Ratio"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  )
+
+# Example: pivot data longer to plot multiple agent types in one plot
+all_summaries_long <- all_summaries %>%
+  mutate(Ratio = paste(Sus, Doubt, sep = ":")) %>%
+  select(TimeType, Ratio, Alpha, Mean_Believer, Mean_Recovered, Mean_Exposed) %>%
+  pivot_longer(cols = starts_with("Mean_"), 
+               names_to = "AgentType", 
+               values_to = "MeanPercent") %>%
+  mutate(
+    AgentType = case_when(
+      AgentType == "Mean_Believer" ~ "Believer",
+      AgentType == "Mean_Recovered" ~ "Recovered",
+      AgentType == "Mean_Exposed" ~ "Exposed",
+      TRUE ~ AgentType
+    ),
+    Alpha = factor(Alpha)  # for discrete x-axis
+  )
+
+ggplot(all_summaries_long, aes(x = Alpha, y = MeanPercent, group = AgentType, color = AgentType)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 3) +
+  facet_grid(TimeType ~ Ratio) +
+  labs(
+    title = "Misinformation Retention Over Influence Strength and Agent Ratios",
+    subtitle = "Day vs Week measurements, by Susceptible:Doubter ratios",
+    x = "Influence Strength (α)",
+    y = "Mean % of Agents",
+    color = "Agent Type"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold"),
+    legend.position = "bottom"
+  )
+
+# Check what mean columns exist
+names(all_summaries)
+
+
+```
+```{r}
+library(tidyverse)
+
+# Assuming 'all_summaries' dataframe has columns:
+# TimeType, Ratio, Alpha, Mean_Believer, Mean_Recovered, Mean_Exposed
+
+# Basic check which mean columns exist
+mean_cols <- c("Mean_Believer", "Mean_Recovered", "Mean_Exposed")
+mean_cols <- mean_cols[mean_cols %in% colnames(all_summaries)]
+
+# Pivot longer to plot all agents in one plot with color by agent
+plot_data <- all_summaries %>%
+  select(TimeType, Ratio, Alpha, all_of(mean_cols)) %>%
+  pivot_longer(
+    cols = all_of(mean_cols),
+    names_to = "Agent",
+    values_to = "Mean"
+  )
+
+# Create plot
+p <- ggplot(plot_data, aes(x = factor(Alpha), y = Mean, group = interaction(Ratio, Agent), color = Agent)) +
+  geom_line(aes(linetype = Ratio), size = 1.1) +
+  geom_point(aes(shape = Ratio), size = 3) +
+  facet_wrap(~ TimeType) +
+  scale_color_brewer(palette = "Set1") +
+  labs(
+    title = "Mean % Agents over Influence Strength (α) by Susceptible:Doubter Ratio",
+    subtitle = "Faceted by TimeType (Day vs Week)",
+    x = "Influence Strength (α)",
+    y = "Mean Percentage",
+    color = "Agent Type",
+    linetype = "Ratio (Sus:Doubt)",
+    shape = "Ratio (Sus:Doubt)"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom",
+    legend.box = "vertical",
+    legend.margin=margin()
+  )
+
+# Save plot to PNG
+ggsave("RQ3_Misinformation_Plot.png", p, width = 12, height = 7, dpi = 300)
+
+# Print plot in RStudio viewer
+print(p)
+
+```
+```{r}
+library(tidyverse)
+
+# Check mean columns present
+mean_cols <- c("Mean_Believer", "Mean_Recovered", "Mean_Exposed")
+mean_cols <- mean_cols[mean_cols %in% colnames(all_summaries)]
+
+# Prepare data in long format
+plot_data <- all_summaries %>%
+  select(TimeType, Ratio, Alpha, all_of(mean_cols)) %>%
+  pivot_longer(
+    cols = all_of(mean_cols),
+    names_to = "Agent",
+    values_to = "Mean"
+  )
+
+# Plot with Ratio as color, Agent as linetype and shape
+p <- ggplot(plot_data, aes(x = factor(Alpha), y = Mean, group = interaction(Ratio, Agent), color = Ratio)) +
+  geom_line(aes(linetype = Agent), size = 1.1) +
+  geom_point(aes(shape = Agent), size = 3) +
+  facet_wrap(~ TimeType) +
+  scale_color_brewer(palette = "Dark2") +  # Distinct colors for ratios
+  labs(
+    title = "Mean % Agents over Influence Strength (α) by Susceptible:Doubter Ratio",
+    subtitle = "Faceted by TimeType (Day vs Week)",
+    x = "Influence Strength (α)",
+    y = "Mean Percentage",
+    color = "Ratio (Sus:Doubt)",
+    linetype = "Agent Type",
+    shape = "Agent Type"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom",
+    legend.box = "vertical",
+    legend.margin=margin()
+  )
+
+# Save to PNG file
+ggsave("RQ3_Misinformation_Plot_byRatioColor.png", p, width = 12, height = 7, dpi = 300)
+
+# Display plot
+print(p)
+
+```
+
+```{r}
+library(tidyverse)
+
+# Prepare long format data
+mean_cols <- c("Mean_Believer", "Mean_Recovered", "Mean_Exposed")
+mean_cols <- mean_cols[mean_cols %in% colnames(all_summaries)]
+
+plot_data <- all_summaries %>%
+  select(TimeType, Ratio, Alpha, all_of(mean_cols)) %>%
+  pivot_longer(
+    cols = all_of(mean_cols),
+    names_to = "Agent",
+    values_to = "Mean"
+  ) %>%
+  mutate(Alpha = factor(Alpha))
+
+# Boxplot version:
+p_box <- ggplot(plot_data, aes(x = Ratio, y = Mean, fill = Agent)) +
+  geom_boxplot(alpha = 0.7, outlier.size = 1) +
+  facet_grid(TimeType ~ Alpha, scales = "free_x", space = "free") +
+  scale_fill_brewer(palette = "Set2") +
+  labs(
+    title = "Distribution of Mean Agent Percentages by Ratio and Influence Strength",
+    subtitle = "Faceted by TimeType (Day vs Week) and Influence Strength (α)",
+    x = "Susceptible:Doubter Ratio",
+    y = "Mean Percentage",
+    fill = "Agent Type"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom",
+    strip.text = element_text(face = "bold")
+  )
+
+# Save to file
+ggsave("RQ3_Boxplot_Misinformation.png", p_box, width = 14, height = 8, dpi = 300)
+
+print(p_box)
+
+```
+
+```{r}
+
+p_violin <- ggplot(plot_data, aes(x = Ratio, y = Mean, fill = Agent)) +
+  geom_violin(alpha = 0.5, trim = FALSE) +
+  geom_boxplot(width = 0.1, position = position_dodge(width = 0.9), outlier.size = 0.5) +
+  facet_grid(TimeType ~ Alpha, scales = "free_x", space = "free") +
+  scale_fill_brewer(palette = "Set2") +
+  labs(
+    title = "Violin Plot of Agent Percentages by Ratio and Influence Strength",
+    subtitle = "Faceted by Day/Week and α",
+    x = "Susceptible:Doubter Ratio",
+    y = "Mean Percentage",
+    fill = "Agent Type"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom",
+        strip.text = element_text(face = "bold"))
+
+ggsave("RQ3_Violin_Misinformation.png", p_violin, width = 14, height = 8, dpi = 300)
+print(p_violin)
+
+
+```
+
+```{r}
+summary_stats <- plot_data %>%
+  group_by(TimeType, Ratio, Alpha, Agent) %>%
+  summarise(
+    mean_val = mean(Mean, na.rm = TRUE),
+    sd_val = sd(Mean, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+p_point <- ggplot(summary_stats, aes(x = Ratio, y = mean_val, color = Agent, group = Agent)) +
+  geom_point(position = position_dodge(width = 0.8), size = 3) +
+  geom_errorbar(aes(ymin = mean_val - sd_val, ymax = mean_val + sd_val),
+                width = 0.3, position = position_dodge(width = 0.8)) +
+  facet_grid(TimeType ~ Alpha, scales = "free_x", space = "free") +
+  scale_color_brewer(palette = "Set1") +
+  labs(
+    title = "Mean Agent Percentages with SD Error Bars",
+    subtitle = "Faceted by Day/Week and Influence Strength (α)",
+    x = "Susceptible:Doubter Ratio",
+    y = "Mean Percentage",
+    color = "Agent Type"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom",
+        strip.text = element_text(face = "bold"))
+
+ggsave("RQ3_PointError_Misinformation.png", p_point, width = 14, height = 8, dpi = 300)
+print(p_point)
+
+```
+
+```{r}
+summary_table <- plot_data %>%
+  group_by(TimeType, Ratio, Alpha, Agent) %>%
+  summarise(
+    mean = mean(Mean, na.rm = TRUE),
+    sd = sd(Mean, na.rm = TRUE),
+    median = median(Mean, na.rm = TRUE),
+    n = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(TimeType, Alpha, Ratio, Agent)
+
+# View summary table
+print(summary_table)
+
+# Save as CSV
+write.csv(summary_table, "RQ3_Summary_Stats.csv", row.names = FALSE)
+
+```
+
+```{r}
+library(tidyverse)
+
+mean_cols <- c("Mean_Believer", "Mean_Recovered", "Mean_Exposed")
+mean_cols <- mean_cols[mean_cols %in% colnames(all_summaries)]
+
+plot_data <- all_summaries %>%
+  select(TimeType, Ratio, Alpha, all_of(mean_cols)) %>%
+  pivot_longer(
+    cols = all_of(mean_cols),
+    names_to = "Agent",
+    values_to = "Mean"
+  ) %>%
+  mutate(Alpha = factor(Alpha))
+
+p_box <- ggplot(plot_data, aes(x = Ratio, y = Mean, fill = Agent)) +
+  geom_boxplot(alpha = 0.7, outlier.size = 1) +
+  facet_grid(TimeType ~ Alpha, scales = "free_x", space = "free") +
+  scale_fill_manual(values = c(
+    "Mean_Believer" = "#D73027",
+    "Mean_Recovered" = "#FC8D59",
+    "Mean_Exposed" = "#FEE08B"
+  )) +
+  labs(
+    title = "Distribution of Mean Agent Percentages by Ratio and Influence Strength",
+    subtitle = "Faceted by TimeType (Day vs Week) and Influence Strength (α)",
+    x = "Susceptible:Doubter Ratio",
+    y = "Mean Percentage",
+    fill = "Agent Type"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom",
+    strip.text = element_text(face = "bold")
+  )
+
+ggsave("RQ3_Boxplot_Misinformation_Red.png", p_box, width = 14, height = 8, dpi = 300)
+print(p_box)
+
+```
+
+
+ 

@@ -1,0 +1,2825 @@
+---
+title: "rq4"
+author: "Clara Holst"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r}
+# Load required libraries
+library(tidyverse)
+library(lubridate)
+
+folder_week <- "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ4/Week/"
+folder_day  <- "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ4/Day/"
+
+# List all relevant simulation files
+file_paths_week <- c(
+  "L1_V1_R1_20250524_142151.csv",
+  "L1_V1_R2_20250524_142508.csv",
+  "L1_V1_R3_20250524_142826.csv",
+  "L1_V1_R4_20250524_143154.csv",
+  "L1_V1_R5_20250524_143520.csv",
+  "L1_V3_R1_20250524_143836.csv",
+  "L1_V3_R2_20250524_144153.csv",
+  "L1_V3_R3_20250524_144511.csv",
+  "L1_V3_R4_20250524_144826.csv",
+  "L1_V3_R5_20250524_145141.csv",
+  "M5_V1_R1_20250524_145458.csv",
+  "M5_V1_R2_20250524_145822.csv",
+  "M5_V1_R3_20250524_150142.csv",
+  "M5_V1_R4_20250524_150507.csv",
+  "M5_V1_R5_20250524_150831.csv",
+  "M5_V3_R1_20250524_151144.csv",
+  "M5_V3_R2_20250524_151458.csv",
+  "M5_V3_R3_20250524_151814.csv",
+  "M5_V3_R4_20250524_152128.csv",
+  "M5_V3_R5_20250524_152442.csv",
+  "H10_V1_R1_20250524_152755.csv",
+  "H10_V1_R2_20250524_153124.csv",
+  "H10_V1_R3_20250524_153445.csv",
+  "H10_V1_R4_20250524_153807.csv",
+  "H10_V1_R5_20250524_154121.csv",
+  "H10_V3_R1_20250524_154400.csv",
+  "H10_V3_R2_20250524_154655.csv",
+  "H10_V3_R3_20250524_154927.csv",
+  "H10_V3_R4_20250524_155159.csv",
+  "H10_V3_R5_20250524_155431.csv",
+  "H10_V5_R1_20250524_155703.csv",
+  "H10_V5_R2_20250524_155936.csv",
+  "H10_V5_R3_20250524_160208.csv",
+  "H10_V5_R4_20250524_160440.csv",
+  "H10_V5_R5_20250524_160711.csv",
+  "M5_SD_R1_20250524_160943.csv",
+  "M5_SD_R2_20250524_161213.csv",
+  "M5_SD_R3_20250524_161451.csv",
+  "M5_SD_R4_20250524_161739.csv",
+  "M5_SD_R5_20250524_162040.csv",
+  "H10_DD_R1_20250524_162330.csv",
+  "H10_DD_R2_20250524_162631.csv",
+  "H10_DD_R3_20250524_162917.csv",
+  "H10_DD_R4_20250524_163413.csv",
+  "H10_DD_R5_20250524_163649.csv"
+)
+
+file_paths_day <- c(
+  "L1_V1_R1_20250524_164438.csv",
+  "L1_V1_R2_20250524_164507.csv",
+  "L1_V1_R3_20250524_164535.csv",
+  "L1_V1_R4_20250524_164603.csv",
+  "L1_V1_R5_20250524_164630.csv",
+  "L1_V3_R1_20250524_164658.csv",
+  "L1_V3_R2_20250524_164726.csv",
+  "L1_V3_R3_20250524_164753.csv",
+  "L1_V3_R4_20250524_164822.csv",
+  "L1_V3_R5_20250524_164850.csv",
+  "M5_V1_R1_20250524_164917.csv",
+  "M5_V1_R2_20250524_164945.csv",
+  "M5_V1_R3_20250524_165013.csv",
+  "M5_V1_R4_20250524_165041.csv",
+  "M5_V1_R5_20250524_165109.csv",
+  "M5_V3_R1_20250524_165137.csv",
+  "M5_V3_R2_20250524_165204.csv",
+  "M5_V3_R3_20250524_165232.csv",
+  "M5_V3_R4_20250524_165300.csv",
+  "M5_V3_R5_20250524_165328.csv",
+  "H10_V1_R1_20250524_165357.csv",
+  "H10_V1_R2_20250524_165428.csv",
+  "H10_V1_R3_20250524_165459.csv",
+  "H10_V1_R4_20250524_165528.csv",
+  "H10_V1_R5_20250524_165559.csv",
+  "H10_V3_R1_20250524_165631.csv",
+  "H10_V3_R2_20250524_165703.csv",
+  "H10_V3_R3_20250524_165735.csv",
+  "H10_V3_R4_20250524_165805.csv",
+  "H10_V3_R5_20250524_165836.csv",
+  "H10_V5_R1_20250524_165906.csv",
+  "H10_V5_R2_20250524_165936.csv",
+  "H10_V5_R3_20250524_170008.csv",
+  "H10_V5_R4_20250524_170038.csv",
+  "H10_V5_R5_20250524_170109.csv",
+  "M5_SD_R1_20250524_170141.csv",
+  "M5_SD_R2_20250524_170213.csv",
+  "M5_SD_R3_20250524_170244.csv",
+  "M5_SD_R4_20250524_170316.csv",
+  "M5_SD_R5_20250524_170347.csv",
+  "H10_DD_R1_20250524_170416.csv",
+  "H10_DD_R2_20250524_170444.csv",
+  "H10_DD_R3_20250524_170511.csv",
+  "H10_DD_R4_20250524_170539.csv",
+  "H10_DD_R5_20250524_170607.csv"
+)
+
+# Helper function to load files with full paths, adding Run column
+load_simulation_data <- function(folder, filenames) {
+  filenames_full <- paste0(folder, filenames)
+  map_dfr(filenames_full, ~ {
+    df <- read_csv(.x, show_col_types = FALSE)
+    df$Run <- basename(.x)
+    df
+  })
+}
+
+# Load week data
+week_data <- load_simulation_data(folder_week, file_paths_week)
+
+# Load day data
+day_data <- load_simulation_data(folder_day, file_paths_day)
+
+# Read and combine all files, adding a 'Run' column for each
+all_data <- bind_rows(
+  week_data %>% mutate(Type = "Week"),
+  day_data %>% mutate(Type = "Day")
+)
+
+# Combine Day and Time into a DateTime and Minutes column (no mutate)
+all_data$DateTime <- as.POSIXct(
+  paste("2023-01-01", all_data$Time), format = "%Y-%m-%d %H:%M"
+) + (all_data$Day - 1) * 24 * 60 * 60
+
+all_data$Minutes <- as.numeric(difftime(all_data$DateTime, min(all_data$DateTime), units = "mins"))
+
+# Calculate total agents and proportions (no mutate)
+all_data$TotalAgents <- all_data$Susceptible + all_data$Exposed + all_data$Believer +
+                        all_data$Doubter + all_data$Recovered + all_data$Disinformant
+all_data$Prop_Recovered <- all_data$Recovered / all_data$TotalAgents
+all_data$Prop_Believer <- all_data$Believer / all_data$TotalAgents
+
+# Summarize: mean/max recovery and time to first recovery per environment and run
+summary_table <- all_data %>%
+  group_by(Run, Environment) %>%
+  summarise(
+    Mean_Prop_Recovered = mean(Prop_Recovered, na.rm = TRUE),
+    Max_Prop_Recovered = max(Prop_Recovered, na.rm = TRUE),
+    First_Recovery_Minute = Minutes[which(Recovered > 0)[1]]
+  )
+
+print(summary_table)
+
+# Plot: Recovery dynamics over time by environment (all runs)
+ggplot(all_data, aes(x = Minutes, y = Prop_Recovered, color = Environment, group = interaction(Run, Environment))) +
+  geom_line(alpha = 0.5) +
+  labs(
+    title = "Recovery Dynamics by Environment (All Runs)",
+    x = "Minutes since start",
+    y = "Proportion Recovered"
+  ) +
+  theme_minimal()
+
+```
+
+```{r}
+# THIS ONE IS THE BEST ONE
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(patchwork)
+
+# Set your data folders
+folder_week <- "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ4/Week/"
+folder_day  <- "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/Data/RQ4/Day/"
+
+# Helper function to load files with full paths, adding Run column
+load_simulation_data <- function(folder, filenames) {
+  filenames_full <- paste0(folder, filenames)
+  map_dfr(filenames_full, ~ {
+    df <- read_csv(.x, show_col_types = FALSE)
+    df$Run <- basename(.x)
+    df
+  })
+}
+
+# Load data
+week_data <- load_simulation_data(folder_week, file_paths_week)
+day_data  <- load_simulation_data(folder_day, file_paths_day)
+
+
+# Only keep Day data between 07:00 (420) and 00:00 (1440)
+all_data <- all_data %>%
+  filter(!(Type == "Day" & (MinutesSinceMidnight < 420 | MinutesSinceMidnight >= 1440)))
+
+# Recalculate TimeUnit and TimeLabel for plotting
+all_data <- all_data %>%
+  mutate(
+    TimeUnit = ifelse(Type == "Day", floor((MinutesSinceMidnight - 420) / 10), floor(Minutes / 1440)),
+    # For Day: label as time of day; for Week: as day
+    TimeLabel = ifelse(Type == "Day",
+                       format(as.POSIXct("07:00", format="%H:%M") + (TimeUnit * 10 * 60), "%H:%M"),
+                       paste0("Day ", floor(Minutes / 1440)))
+  )
+
+# Aggregate for analysis
+analysis_data <- all_data %>%
+  group_by(Type, Environment, Valence, TimeUnit, TimeLabel) %>%
+  summarise(
+    Mean_Recovery = mean(Prop_Recovered, na.rm = TRUE),
+    SE_Recovery = sd(Prop_Recovered, na.rm = TRUE)/sqrt(n()),
+    Mean_Resilience = 1 - mean(Prop_Believer, na.rm = TRUE),
+    SE_Resilience = sd(Prop_Believer, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = starts_with("Mean_"),
+    names_to = "Metric",
+    values_to = "Proportion"
+  ) %>%
+  mutate(
+    SE = ifelse(str_detect(Metric, "Recovery"), SE_Recovery, SE_Resilience),
+    Metric = str_remove(Metric, "Mean_")
+  )
+
+# Day plot with correct time axis (07:00-00:00)
+day_plot <- analysis_data %>%
+  filter(Type == "Day") %>%
+  ggplot(aes(x = TimeUnit, y = Proportion, color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1, scales = "free_x") +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(
+    breaks = seq(0, (1440-420)/10, by = 6), # every hour
+    labels = function(x) format(as.POSIXct("07:00", format="%H:%M") + x*10*60, "%H:%M")
+  ) +
+  labs(
+    x = "Time of Day (10-min intervals)", 
+    title = "Day Simulation (Active Periods)",
+    subtitle = "Social media: 07:00-08:00 & 19:00-21:00 | Work: 08:00-16:00 | Home: rest"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 12)
+  )
+
+# Week plot (unchanged)
+week_plot <- analysis_data %>%
+  filter(Type == "Week") %>%
+  ggplot(aes(x = TimeUnit, y = Proportion, color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(0, 7, 1), labels = ~paste0(.x, "d")) +
+  labs(x = "Days", title = "Week Simulation (7d)") +
+  theme_minimal()
+
+# Combine and save
+combined_plot <- (day_plot / week_plot) + 
+  plot_layout(guides = "collect") &
+  scale_color_brewer(palette = "Dark2") &
+  scale_fill_brewer(palette = "Dark2") &
+  scale_linetype_manual(values = c("Recovery" = "solid", "Resilience" = "dashed"),
+                        labels = c("Recovery Rate", "Resilience (1 - Believers)")) &
+  labs(y = "Proportion of Population",
+       color = "Emotional Valence",
+       fill = "Emotional Valence",
+       linetype = "Metric") &
+  theme(legend.position = "top",
+        legend.box = "vertical",
+        plot.title = element_text(hjust = 0.5))
+
+final_plot <- combined_plot + 
+  plot_annotation(
+    title = "Recovery and Resilience Dynamics by Environment and Emotional Valence",
+    subtitle = "Error ribbons show ±1 SE | Work environments show most consistent recovery",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5, size = 12)
+    )
+  )
+
+# Save to your specified folder
+ggsave(
+  filename = "recovery_resilience_time_units_HOPE5.png",
+  plot = final_plot,
+  path = "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation",
+  width = 14, height = 10, dpi = 300
+)
+
+```
+
+# Summary
+```{r}
+# Create summary table for both Recovery and Resilience
+summary_output <- analysis_data %>%
+  group_by(Type, Environment, Valence, Metric) %>%
+  summarise(
+    Mean = mean(Proportion, na.rm = TRUE),
+    SD   = sd(Proportion, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Mean = scales::percent(Mean, accuracy = 0.1),
+    SD   = scales::percent(SD, accuracy = 0.1)
+  ) %>%
+  arrange(Type, Environment, Valence, Metric)
+
+# Print summary table
+print(summary_output)
+
+write_csv(
+  summary_output,
+  "D:/UNI/4th Semester/Social and Cultural Dynamics/Misinformation/recovery_resilience_summary.csv"
+)
+
+```
+
+
+```{r}
+
+library(tidyverse)
+library(scales)
+library(patchwork)
+
+# Define environment time zones
+environment_time_zones <- tribble(
+  ~Environment, ~Start, ~End,
+  "social_media", "07:00", "08:00",
+  "social_media", "19:00", "21:00",
+  "work", "08:00", "16:00",
+  "home", "16:00", "19:00",
+  "home", "21:00", "00:00"
+) %>%
+  mutate(
+    Start_Time = as.POSIXct(Start, format = "%H:%M"),
+    End_Time = as.POSIXct(End, format = "%H:%M"),
+    Start_Min = as.numeric(difftime(Start_Time, as.POSIXct("00:00", format = "%H:%M"), units = "mins")),
+    End_Min = as.numeric(difftime(End_Time, as.POSIXct("00:00", format = "%H:%M"), units = "mins"))
+  )
+
+# Combine and tag data
+all_data <- bind_rows(
+  week_data %>% mutate(Type = "Week"),
+  day_data %>% mutate(Type = "Day")
+) %>%
+  mutate(
+    # Parse DateTime and minutes since start
+    DateTime = as.POSIXct(paste("2023-01-01", Time), format = "%Y-%m-%d %H:%M") + 
+               (Day - 1) * 24 * 60 * 60,
+    Minutes = as.numeric(difftime(DateTime, min(DateTime), units = "mins")),
+    
+    # Extract Minutes Since Midnight
+    MinutesSinceMidnight = hour(DateTime) * 60 + minute(DateTime),
+    
+    # Assign custom Environment for Day data
+    Environment = ifelse(Type == "Day", case_when(
+      MinutesSinceMidnight >= 420 & MinutesSinceMidnight < 480 ~ "social_media",  # 07:00–08:00
+      MinutesSinceMidnight >= 1140 & MinutesSinceMidnight < 1260 ~ "social_media", # 19:00–21:00
+      MinutesSinceMidnight >= 480 & MinutesSinceMidnight < 960 ~ "work",           # 08:00–16:00
+      MinutesSinceMidnight >= 360 & MinutesSinceMidnight < 420 ~ "home",           # 06:00–07:00
+      MinutesSinceMidnight >= 960 & MinutesSinceMidnight < 1140 ~ "home",          # 16:00–19:00
+      MinutesSinceMidnight >= 1260 | MinutesSinceMidnight < 360 ~ "home",          # 21:00–00:00 + 00:00–06:00
+      TRUE ~ NA_character_
+    ), Environment)  # leave Week untouched
+  ) %>%
+  # Remove sleep time for Day data
+  filter(!(Type == "Day" & MinutesSinceMidnight < 360)) %>%
+  
+  # Compute other variables
+    mutate(
+    # Parse DateTime and minutes since start
+    DateTime = as.POSIXct(paste("2023-01-01", Time), format = "%Y-%m-%d %H:%M") + 
+               (Day - 1) * 24 * 60 * 60,
+    Minutes = as.numeric(difftime(DateTime, min(DateTime), units = "mins")),
+    
+    # Extract Minutes Since Midnight
+    MinutesSinceMidnight = hour(DateTime) * 60 + minute(DateTime),
+    
+    # Assign custom Environment for Day data
+    Environment = ifelse(Type == "Day", case_when(
+      MinutesSinceMidnight >= 420 & MinutesSinceMidnight < 480 ~ "social_media",  # 07:00–08:00
+      MinutesSinceMidnight >= 1140 & MinutesSinceMidnight < 1260 ~ "social_media", # 19:00–21:00
+      MinutesSinceMidnight >= 480 & MinutesSinceMidnight < 960 ~ "work",           # 08:00–16:00
+      MinutesSinceMidnight >= 360 & MinutesSinceMidnight < 420 ~ "home",           # 06:00–07:00
+      MinutesSinceMidnight >= 960 & MinutesSinceMidnight < 1140 ~ "home",          # 16:00–19:00
+      MinutesSinceMidnight >= 1260 | MinutesSinceMidnight < 360 ~ "home",          # 21:00–00:00 + 00:00–06:00
+      TRUE ~ NA_character_
+    ), Environment),  # leave Week untouched
+    
+    EmotionalValence = case_when(
+      str_detect(Run, "V1_") ~ 1.0,
+      str_detect(Run, "V3_") ~ 3.0,
+      str_detect(Run, "V5_") ~ 5.0,
+      str_detect(Run, "V10_") ~ 10.0,
+      TRUE ~ NA_real_
+    ),
+    Valence = factor(case_when(
+      EmotionalValence <= 3 ~ "Low (1-3)",
+      EmotionalValence <= 7 ~ "Medium (4-7)", 
+      TRUE ~ "High (8-10)"
+    ), levels = c("Low (1-3)", "Medium (4-7)", "High (8-10)")),
+    
+    TotalAgents = Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant,
+    Prop_Recovered = Recovered / TotalAgents,
+    Prop_Believer = Believer / TotalAgents,
+    
+    # COMPUTE TimeUnit FIRST
+    TimeUnit = ifelse(Type == "Day", floor(Minutes / 10), floor(Minutes / 1440)),
+    
+    # Then use TimeUnit here:
+    AdjustedTime = TimeUnit,
+    TimeLabel = ifelse(Type == "Week", paste0("Day ", floor(Minutes / 1440)), format(DateTime, "%H:%M"))
+  )
+
+
+# Create analysis dataset
+analysis_data <- all_data %>%
+  group_by(Type, Environment, Valence, AdjustedTime, TimeLabel) %>%
+  summarise(
+    Mean_Recovery = mean(Prop_Recovered, na.rm = TRUE),
+    SE_Recovery = sd(Prop_Recovered, na.rm = TRUE)/sqrt(n()),
+    Mean_Resilience = 1 - mean(Prop_Believer, na.rm = TRUE),
+    SE_Resilience = sd(Prop_Believer, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = starts_with("Mean_"),
+    names_to = "Metric",
+    values_to = "Proportion"
+  ) %>%
+  mutate(
+    SE = ifelse(str_detect(Metric, "Recovery"), SE_Recovery, SE_Resilience),
+    Metric = str_remove(Metric, "Mean_")
+  )
+
+# Day plot with minute-based time
+day_plot <- analysis_data %>%
+  filter(Type == "Day") %>%
+  ggplot(aes(x = AdjustedTime, y = Proportion, 
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1, scales = "free_x") +
+  scale_y_continuous(labels = scales::percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(
+    breaks = function(x) {
+      seq(floor(min(x)/6)*6, ceiling(max(x)/6)*6, by = 6)
+    },
+    labels = function(x) {
+      format(as.POSIXct("00:00", format="%H:%M") + x*10*60, "%H:%M")
+    }
+  ) +
+  labs(x = "Time of Day (10-min intervals)", 
+       title = "Day Simulation (Active Periods)",
+       subtitle = "Social media: 07:00-08:00 & 19:00-21:00 | Work: 08:00-16:00 | Home: rest") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Week plot
+week_plot <- analysis_data %>%
+  filter(Type == "Week") %>%
+  ggplot(aes(x = AdjustedTime, y = Proportion, 
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_y_continuous(labels = scales::percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(0, 7, 1), labels = ~paste0(.x, "d")) +
+  labs(x = "Days", title = "Week Simulation (7d)") +
+  theme_minimal()
+
+# Combine plots
+combined_plot <- (day_plot / week_plot) + 
+  patchwork::plot_layout(guides = "collect") &
+  scale_color_brewer(palette = "Dark2") &
+  scale_fill_brewer(palette = "Dark2") &
+  scale_linetype_manual(values = c("Recovery" = "solid", "Resilience" = "dashed"),
+                        labels = c("Recovery Rate", "Resilience (1 - Believers)")) &
+  labs(y = "Proportion of Population",
+       color = "Emotional Valence",
+       fill = "Emotional Valence",
+       linetype = "Metric") &
+  theme(legend.position = "top",
+        legend.box = "vertical",
+        plot.title = element_text(hjust = 0.5))
+
+# Final plot
+final_plot <- combined_plot + 
+  patchwork::plot_annotation(
+    title = "Recovery and Resilience Dynamics by Environment and Emotional Valence",
+    subtitle = "Error ribbons show ±1 SE | Work environments show most consistent recovery",
+    theme = theme(plot.title = element_text(size = 16, face = "bold"),
+                  plot.subtitle = element_text(size = 12))
+  )
+
+ggsave("recovery_resilience_time_units_HOPE.png", final_plot, width = 14, height = 10, dpi = 300)
+```
+
+```{r}
+library(tidyverse)
+library(scales)
+
+# Process data with proper time calculations
+all_data <- bind_rows(
+  week_data %>% mutate(Type = "Week"),
+  day_data %>% mutate(Type = "Day")
+) %>%
+  mutate(
+    # Extract valence from filename (V1 = 1.0, V3 = 3.0, etc.)
+    EmotionalValence = case_when(
+      str_detect(Run, "V1_") ~ 1.0,
+      str_detect(Run, "V3_") ~ 3.0,
+      str_detect(Run, "V5_") ~ 5.0,
+      str_detect(Run, "V10_") ~ 10.0,
+      TRUE ~ NA_real_
+    ),
+    # Create valence categories
+    Valence = factor(case_when(
+      EmotionalValence <= 3 ~ "Low (1-3)",
+      EmotionalValence <= 7 ~ "Medium (4-7)", 
+      TRUE ~ "High (8-10)"
+    ), levels = c("Low (1-3)", "Medium (4-7)", "High (8-10)")),
+    
+    # Calculate proper time columns
+    DateTime = as.POSIXct(paste("2023-01-01", Time), format = "%Y-%m-%d %H:%M") + 
+               (Day - 1) * 24 * 60 * 60,
+    Minutes = as.numeric(difftime(DateTime, min(DateTime), units = "mins")),
+    TimeBin = floor(Minutes/120)*120,  # 2-hour bins
+    
+    # Calculate proportions
+    Prop_Recovered = Recovered / (Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant),
+    Prop_Believer = Believer / (Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant)
+  )
+
+# Create analysis dataset
+analysis_data <- all_data %>%
+  group_by(Type, Environment, Valence, TimeBin) %>%
+  summarise(
+    Mean_Recovery = mean(Prop_Recovered, na.rm = TRUE),
+    SE_Recovery = sd(Prop_Recovered, na.rm = TRUE)/sqrt(n()),
+    Mean_Resilience = 1 - mean(Prop_Believer, na.rm = TRUE),
+    SE_Resilience = sd(Prop_Believer, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = starts_with("Mean_"),
+    names_to = "Metric",
+    values_to = "Proportion"
+  ) %>%
+  mutate(
+    SE = ifelse(str_detect(Metric, "Recovery"), SE_Recovery, SE_Resilience),
+    Metric = str_remove(Metric, "Mean_")
+  )
+
+# Visualization
+ggplot(analysis_data, aes(x = TimeBin, y = Proportion, 
+                         color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_grid(Type ~ Environment) +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(0, 10080, 1440), # Breaks every 24h
+                    labels = ~paste0(.x/1440, "d")) +
+  scale_color_brewer(palette = "Dark2") +
+  scale_fill_brewer(palette = "Dark2") +
+  scale_linetype_manual(values = c("Recovery" = "solid", "Resilience" = "dashed"),
+                        labels = c("Recovery Rate", "Resilience (1 - Believers)")) +
+  labs(
+    title = "Recovery and Resilience Dynamics by Environment and Emotional Valence",
+    subtitle = "Data binned in 2-hour intervals | Error ribbons show ±1 SE",
+    x = "Simulation Time",
+    y = "Proportion of Population",
+    color = "Emotional Valence",
+    fill = "Emotional Valence",
+    linetype = "Metric"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "top",
+    panel.spacing = unit(1.5, "lines"),
+    strip.text = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+ggsave("recovery_resilience_analysis.png", width = 14, height = 8, dpi = 300)
+```
+```{r}
+library(tidyverse)
+library(scales)
+
+# Process data with time unit adjustment
+all_data <- bind_rows(
+  week_data %>% mutate(Type = "Week"),
+  day_data %>% mutate(Type = "Day")
+) %>%
+  mutate(
+    # Extract valence from filename
+    EmotionalValence = case_when(
+      str_detect(Run, "V1_") ~ 1.0,
+      str_detect(Run, "V3_") ~ 3.0,
+      str_detect(Run, "V5_") ~ 5.0,
+      str_detect(Run, "V10_") ~ 10.0,
+      TRUE ~ NA_real_
+    ),
+    Valence = factor(case_when(
+      EmotionalValence <= 3 ~ "Low (1-3)",
+      EmotionalValence <= 7 ~ "Medium (4-7)", 
+      TRUE ~ "High (8-10)"
+    ), levels = c("Low (1-3)", "Medium (4-7)", "High (8-10)")),
+    
+    # Calculate time columns with different units
+    DateTime = as.POSIXct(paste("2023-01-01", Time), format = "%Y-%m-%d %H:%M") + 
+               (Day - 1) * 24 * 60 * 60,
+    Minutes = as.numeric(difftime(DateTime, min(DateTime), units = "mins")),
+    # Different time bins for day vs week
+    TimeUnit = ifelse(Type == "Day", 
+                     floor(Minutes/60),    # Hours for day simulations
+                     floor(Minutes/1440)), # Days for week simulations
+    TimeLabel = ifelse(Type == "Day", 
+                      paste0(TimeUnit, "h"), 
+                      paste0(TimeUnit, "d")),
+    
+    # Calculate proportions
+    Prop_Recovered = Recovered / (Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant),
+    Prop_Believer = Believer / (Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant)
+  )
+
+# Create analysis dataset
+analysis_data <- all_data %>%
+  group_by(Type, Environment, Valence, TimeUnit, TimeLabel) %>%
+  summarise(
+    Mean_Recovery = mean(Prop_Recovered, na.rm = TRUE),
+    SE_Recovery = sd(Prop_Recovered, na.rm = TRUE)/sqrt(n()),
+    Mean_Resilience = 1 - mean(Prop_Believer, na.rm = TRUE),
+    SE_Resilience = sd(Prop_Believer, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = starts_with("Mean_"),
+    names_to = "Metric",
+    values_to = "Proportion"
+  ) %>%
+  mutate(
+    SE = ifelse(str_detect(Metric, "Recovery"), SE_Recovery, SE_Resilience),
+    Metric = str_remove(Metric, "Mean_")
+  )
+
+# Create separate scales for x-axis
+day_plot <- analysis_data %>%
+  filter(Type == "Day") %>%
+  ggplot(aes(x = TimeUnit, y = Proportion, 
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(0, 24, 4), labels = ~paste0(.x, "h")) +
+  labs(x = "Hours", title = "Day Simulation (24h)") +
+  theme_minimal()
+
+week_plot <- analysis_data %>%
+  filter(Type == "Week") %>%
+  ggplot(aes(x = TimeUnit, y = Proportion, 
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(0, 7, 1), labels = ~paste0(.x, "d")) +
+  labs(x = "Days", title = "Week Simulation (7d)") +
+  theme_minimal()
+
+# Combine plots with shared legend
+combined_plot <- (day_plot / week_plot) + 
+  plot_layout(guides = "collect") &
+  scale_color_brewer(palette = "Dark2") &
+  scale_fill_brewer(palette = "Dark2") &
+  scale_linetype_manual(values = c("Recovery" = "solid", "Resilience" = "dashed"),
+                        labels = c("Recovery Rate", "Resilience (1 - Believers)")) &
+  labs(y = "Proportion of Population",
+       color = "Emotional Valence",
+       fill = "Emotional Valence",
+       linetype = "Metric") &
+  theme(legend.position = "top",
+        legend.box = "vertical",
+        plot.title = element_text(hjust = 0.5))
+
+# Add global title
+final_plot <- combined_plot + 
+  plot_annotation(
+    title = "Recovery and Resilience Dynamics by Environment and Emotional Valence",
+    subtitle = "Error ribbons show ±1 SE | Work environments show most consistent recovery",
+    theme = theme(plot.title = element_text(size = 16, face = "bold"),
+                  plot.subtitle = element_text(size = 12))
+  )
+
+ggsave("recovery_resilience_time_units.png", final_plot, width = 14, height = 10, dpi = 300)
+```
+```{r}
+library(tidyverse)
+library(scales)
+
+# Process data with time unit adjustment
+all_data <- bind_rows(
+  week_data %>% mutate(Type = "Week"),
+  day_data %>% mutate(Type = "Day")
+) %>%
+  mutate(
+    # Extract valence from filename
+    EmotionalValence = case_when(
+      str_detect(Run, "V1_") ~ 1.0,
+      str_detect(Run, "V3_") ~ 3.0,
+      str_detect(Run, "V5_") ~ 5.0,
+      str_detect(Run, "V10_") ~ 10.0,
+      TRUE ~ NA_real_
+    ),
+    Valence = factor(case_when(
+      EmotionalValence <= 3 ~ "Low (1-3)",
+      EmotionalValence <= 7 ~ "Medium (4-7)", 
+      TRUE ~ "High (8-10)"
+    ), levels = c("Low (1-3)", "Medium (4-7)", "High (8-10)")),
+    
+    # Calculate time columns with different units
+    DateTime = as.POSIXct(paste("2023-01-01", Time), format = "%Y-%m-%d %H:%M") + 
+               (Day - 1) * 24 * 60 * 60,
+    Minutes = as.numeric(difftime(DateTime, min(DateTime), units = "mins")),
+    # Different time bins for day vs week
+    TimeUnit = ifelse(Type == "Day", 
+                     floor(Minutes/10),    # 10-minute intervals for day simulations
+                     floor(Minutes/1440)), # Days for week simulations
+    TimeLabel = ifelse(Type == "Day", 
+                      format(as.POSIXct("06:00", format="%H:%M") + TimeUnit*10*60, "%H:%M"),
+                      paste0(TimeUnit, "d")),
+    
+    # Calculate proportions
+    Prop_Recovered = Recovered / (Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant),
+    Prop_Believer = Believer / (Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant)
+  ) %>%
+  # Filter day data to only include 06:00-00:00 (6am to midnight)
+  filter(!(Type == "Day" & (Minutes < 360 | Minutes > 1440)))
+
+# Create analysis dataset
+analysis_data <- all_data %>%
+  group_by(Type, Environment, Valence, TimeUnit, TimeLabel) %>%
+  summarise(
+    Mean_Recovery = mean(Prop_Recovered, na.rm = TRUE),
+    SE_Recovery = sd(Prop_Recovered, na.rm = TRUE)/sqrt(n()),
+    Mean_Resilience = 1 - mean(Prop_Believer, na.rm = TRUE),
+    SE_Resilience = sd(Prop_Believer, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = starts_with("Mean_"),
+    names_to = "Metric",
+    values_to = "Proportion"
+  ) %>%
+  mutate(
+    SE = ifelse(str_detect(Metric, "Recovery"), SE_Recovery, SE_Resilience),
+    Metric = str_remove(Metric, "Mean_")
+  )
+
+# Create separate scales for x-axis
+day_plot <- analysis_data %>%
+  filter(Type == "Day") %>%
+  ggplot(aes(x = TimeUnit, y = Proportion, 
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(
+    breaks = seq(0, 108, by = 12),  # Every 2 hours (12*10min = 120min)
+    labels = function(x) {
+      time <- as.POSIXct("06:00", format="%H:%M") + x*10*60
+      format(time, "%H:%M")
+    }
+  ) +
+  labs(x = "Time of Day", title = "Day Simulation (06:00-00:00, 10-min intervals)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+week_plot <- analysis_data %>%
+  filter(Type == "Week") %>%
+  ggplot(aes(x = TimeUnit, y = Proportion, 
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(0, 7, 1), labels = ~paste0(.x, "d")) +
+  labs(x = "Days", title = "Week Simulation (7d)") +
+  theme_minimal()
+
+# Combine plots with shared legend
+combined_plot <- (day_plot / week_plot) + 
+  plot_layout(guides = "collect") &
+  scale_color_brewer(palette = "Dark2") &
+  scale_fill_brewer(palette = "Dark2") &
+  scale_linetype_manual(values = c("Recovery" = "solid", "Resilience" = "dashed"),
+                        labels = c("Recovery Rate", "Resilience (1 - Believers)")) &
+  labs(y = "Proportion of Population",
+       color = "Emotional Valence",
+       fill = "Emotional Valence",
+       linetype = "Metric") &
+  theme(legend.position = "top",
+        legend.box = "vertical",
+        plot.title = element_text(hjust = 0.5))
+
+# Add global title
+final_plot <- combined_plot + 
+  plot_annotation(
+    title = "Recovery and Resilience Dynamics by Environment and Emotional Valence",
+    subtitle = "Error ribbons show ±1 SE | Work environments show most consistent recovery",
+    theme = theme(plot.title = element_text(size = 16, face = "bold"),
+                  plot.subtitle = element_text(size = 12))
+  )
+
+ggsave("recovery_resilience_time_units.png", final_plot, width = 14, height = 10, dpi = 300)
+```
+
+```{r}
+library(tidyverse)
+library(scales)
+
+# Define environment time zones
+environment_time_zones <- tribble(
+  ~Environment, ~Start, ~End,
+  "social_media", "07:00", "08:00",
+  "social_media", "19:00", "21:00",
+  "work", "08:00", "16:00",
+  "home", "00:00", "07:00",
+  "home", "08:00", "19:00",
+  "home", "21:00", "00:00"
+) %>%
+  mutate(
+    Start_Time = as.POSIXct(Start, format = "%H:%M"),
+    End_Time = as.POSIXct(End, format = "%H:%M"),
+    Start_Min = as.numeric(difftime(Start_Time, as.POSIXct("00:00", format = "%H:%M"), units = "mins")),
+    End_Min = as.numeric(difftime(End_Time, as.POSIXct("00:00", format = "%H:%M"), units = "mins")))
+    
+# Process data with time unit adjustment
+all_data <- bind_rows(
+  week_data %>% mutate(Type = "Week"),
+  day_data %>% mutate(Type = "Day")
+) %>%
+  mutate(
+    # Extract valence from filename
+    EmotionalValence = case_when(
+      str_detect(Run, "V1_") ~ 1.0,
+      str_detect(Run, "V3_") ~ 3.0,
+      str_detect(Run, "V5_") ~ 5.0,
+      str_detect(Run, "V10_") ~ 10.0,
+      TRUE ~ NA_real_
+    ),
+    Valence = factor(case_when(
+      EmotionalValence <= 3 ~ "Low (1-3)",
+      EmotionalValence <= 7 ~ "Medium (4-7)", 
+      TRUE ~ "High (8-10)"
+    ), levels = c("Low (1-3)", "Medium (4-7)", "High (8-10)")),
+    
+    # Calculate time columns with different units
+    DateTime = as.POSIXct(paste("2023-01-01", as.character(Time)), format = "%Y-%m-%d %H:%M") + 
+               (Day - 1) * 24 * 60 * 60,
+    Minutes = as.numeric(difftime(DateTime, min(DateTime), units = "mins")),
+    # Different time bins for day vs week
+    TimeUnit = ifelse(Type == "Day", 
+                     floor(Minutes/10),    # 10-minute intervals for day simulations
+                     floor(Minutes/1440)), # Days for week simulations
+    
+    # Calculate proportions
+    Prop_Recovered = Recovered / (Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant),
+    Prop_Believer = Believer / (Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant)
+  ) %>%
+  # Filter day data to only include relevant times for each environment
+  left_join(environment_time_zones, by = "Environment") %>%
+  filter(
+    Type == "Week" |  # Keep all week data
+    (Type == "Day" & (
+      (Minutes >= Start_Min & Minutes < End_Min) |  # Within active time for environment
+      (Start_Min > End_Min & (Minutes >= Start_Min | Minutes < End_Min))  # Handles overnight periods
+    ))
+  ) %>%
+  # Create adjusted time units for day plots (continuous within each environment's active periods)
+  group_by(Type, Environment) %>%
+  mutate(
+    TimeLabel = ifelse(Type == "Day",
+                      format(as.POSIXct("00:00", format="%H:%M") + (Minutes - min(Minutes)) * 60, "%H:%M"),
+                      paste0(TimeUnit, "d")),
+    AdjustedTimeUnit = ifelse(Type == "Day",
+                             as.numeric(difftime(
+                               as.POSIXct("00:00", format="%H:%M") + (Minutes - min(Minutes)) * 60,
+                               as.POSIXct("00:00", format="%H:%M"),
+                               units = "mins")) / 10,
+                             TimeUnit)
+  ) %>%
+  ungroup()
+
+# Create analysis dataset
+analysis_data <- all_data %>%
+  group_by(Type, Environment, Valence, AdjustedTimeUnit, TimeLabel) %>%
+  summarise(
+    Mean_Recovery = mean(Prop_Recovered, na.rm = TRUE),
+    SE_Recovery = sd(Prop_Recovered, na.rm = TRUE)/sqrt(n()),
+    Mean_Resilience = 1 - mean(Prop_Believer, na.rm = TRUE),
+    SE_Resilience = sd(Prop_Believer, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = starts_with("Mean_"),
+    names_to = "Metric",
+    values_to = "Proportion"
+  ) %>%
+  mutate(
+    SE = ifelse(str_detect(Metric, "Recovery"), SE_Recovery, SE_Resilience),
+    Metric = str_remove(Metric, "Mean_")
+  )
+
+# Create separate scales for x-axis
+day_plot <- analysis_data %>%
+  filter(Type == "Day") %>%
+  ggplot(aes(x = AdjustedTimeUnit, y = Proportion, 
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1, scales = "free_x") +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(
+    breaks = function(x) {
+      # Create breaks every 60 minutes (1 hour) for each environment
+      seq(floor(min(x)/6)*6, ceiling(max(x)/6)*6, by = 6)
+    },
+    labels = function(x) {
+      # Convert back to time format
+      start_times <- environment_time_zones %>% 
+        group_by(Environment) %>% 
+        summarise(Min_Start = min(Start_Min))
+      
+      sapply(x, function(t) {
+        env <- unique(analysis_data$Environment[analysis_data$AdjustedTimeUnit == t & analysis_data$Type == "Day"])
+        if (length(env) == 0) return("")
+        min_start <- start_times$Min_Start[start_times$Environment == env]
+        time <- as.POSIXct("00:00", format="%H:%M") + (min_start + t*10) * 60
+        format(time, "%H:%M")
+      })
+    }
+  ) +
+  labs(x = "Time of Day", 
+       title = "Day Simulation Showing Active Time Periods by Environment",
+       subtitle = "Social media: 07:00-08:00 & 19:00-21:00 | Work: 08:00-16:00 | Home: other times (sleep 00:00-06:00)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.subtitle = element_text(size = 10))
+
+week_plot <- analysis_data %>%
+  filter(Type == "Week") %>%
+  ggplot(aes(x = AdjustedTimeUnit, y = Proportion, 
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(0, 7, 1), labels = ~paste0(.x, "d")) +
+  labs(x = "Days", title = "Week Simulation (7d)") +
+  theme_minimal()
+
+# Combine plots with shared legend
+combined_plot <- (day_plot / week_plot) + 
+  plot_layout(guides = "collect") &
+  scale_color_brewer(palette = "Dark2") &
+  scale_fill_brewer(palette = "Dark2") &
+  scale_linetype_manual(values = c("Recovery" = "solid", "Resilience" = "dashed"),
+                        labels = c("Recovery Rate", "Resilience (1 - Believers)")) &
+  labs(y = "Proportion of Population",
+       color = "Emotional Valence",
+       fill = "Emotional Valence",
+       linetype = "Metric") &
+  theme(legend.position = "top",
+        legend.box = "vertical",
+        plot.title = element_text(hjust = 0.5))
+
+# Add global title
+final_plot <- combined_plot + 
+  plot_annotation(
+    title = "Recovery and Resilience Dynamics by Environment and Emotional Valence",
+    subtitle = "Error ribbons show ±1 SE | Work environments show most consistent recovery",
+    theme = theme(plot.title = element_text(size = 16, face = "bold"),
+                  plot.subtitle = element_text(size = 12))
+  )
+
+ggsave("recovery_resilience_time_units.png", final_plot, width = 14, height = 10, dpi = 300)
+
+```
+
+```{r}
+library(tidyverse)
+library(scales)
+library(patchwork)
+
+# Define environment time zones
+environment_time_zones <- tribble(
+  ~Environment, ~Start, ~End,
+  "social_media", "07:00", "08:00",
+  "social_media", "19:00", "21:00",
+  "work", "08:00", "16:00",
+  "home", "16:00", "19:00",
+  "home", "21:00", "00:00"
+) %>%
+  mutate(
+    Start_Time = as.POSIXct(Start, format = "%H:%M"),
+    End_Time = as.POSIXct(End, format = "%H:%M"),
+    Start_Min = as.numeric(difftime(Start_Time, as.POSIXct("00:00", format = "%H:%M"), units = "mins")),
+    End_Min = as.numeric(difftime(End_Time, as.POSIXct("00:00", format = "%H:%M"), units = "mins"))
+  )
+
+# Process data with minute-based time filtering
+all_data <- bind_rows(
+  week_data %>% mutate(Type = "Week"),
+  day_data %>% mutate(Type = "Day")
+) %>%
+  mutate(
+    # Extract valence from filename
+    EmotionalValence = case_when(
+      str_detect(Run, "V1_") ~ 1.0,
+      str_detect(Run, "V3_") ~ 3.0,
+      str_detect(Run, "V5_") ~ 5.0,
+      str_detect(Run, "V10_") ~ 10.0,
+      TRUE ~ NA_real_
+    ),
+    Valence = factor(case_when(
+      EmotionalValence <= 3 ~ "Low (1-3)",
+      EmotionalValence <= 7 ~ "Medium (4-7)", 
+      TRUE ~ "High (8-10)"
+    ), levels = c("Low (1-3)", "Medium (4-7)", "High (8-10)")),
+    
+    # Calculate time in minutes
+    DateTime = as.POSIXct(paste("2023-01-01", as.character(Hour)), format = "%Y-%m-%d %H:%M") + 
+               (Day - 1) * 24 * 60 * 60,
+    Minutes = as.numeric(difftime(DateTime, min(DateTime), units = "mins")),
+    TimeUnit = ifelse(Type == "Day", floor(Minutes/10), floor(Minutes/1440)),
+    
+    # Calculate proportions
+    Prop_Recovered = Recovered / (Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant),
+    Prop_Believer = Believer / (Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant)
+  ) %>%
+  # Filter to active periods
+  left_join(environment_time_zones, by = "Environment") %>%
+  filter(
+    Type == "Week" |  # Keep all week data
+    (Type == "Day" & (
+      (Minutes >= Start_Min & Minutes < End_Min) |  # Within active time
+      (Start_Min > End_Min & (Minutes >= Start_Min | Minutes < End_Min))  # Overnight
+    ))
+  ) %>%
+  # Create adjusted time units
+  group_by(Type, Environment) %>%
+  mutate(
+    TimeLabel = ifelse(Type == "Day",
+                      format(as.POSIXct("00:00", format="%H:%M") + (Minutes - min(Minutes)) * 60, "%H:%M"),
+                      paste0(TimeUnit, "d")),
+    AdjustedTime = ifelse(Type == "Day",
+                         as.numeric(difftime(
+                           as.POSIXct("00:00", format="%H:%M") + (Minutes - min(Minutes)) * 60,
+                           as.POSIXct("00:00", format="%H:%M"),
+                           units = "mins")) / 10,
+                         TimeUnit)
+  ) %>%
+  ungroup()
+
+# Create analysis dataset
+analysis_data <- all_data %>%
+  group_by(Type, Environment, Valence, AdjustedTime, TimeLabel) %>%
+  summarise(
+    Mean_Recovery = mean(Prop_Recovered, na.rm = TRUE),
+    SE_Recovery = sd(Prop_Recovered, na.rm = TRUE)/sqrt(n()),
+    Mean_Resilience = 1 - mean(Prop_Believer, na.rm = TRUE),
+    SE_Resilience = sd(Prop_Believer, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = starts_with("Mean_"),
+    names_to = "Metric",
+    values_to = "Proportion"
+  ) %>%
+  mutate(
+    SE = ifelse(str_detect(Metric, "Recovery"), SE_Recovery, SE_Resilience),
+    Metric = str_remove(Metric, "Mean_")
+  )
+
+# Day plot with minute-based time
+day_plot <- analysis_data %>%
+  filter(Type == "Day") %>%
+  ggplot(aes(x = AdjustedTime, y = Proportion, 
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1, scales = "free_x") +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(
+    breaks = function(x) {
+      seq(floor(min(x)/6)*6, ceiling(max(x)/6)*6, by = 6)
+    },
+    labels = function(x) {
+      format(as.POSIXct("00:00", format="%H:%M") + x*10*60, "%H:%M")
+    }
+  ) +
+  labs(x = "Time of Day", 
+       title = "Day Simulation (Active Periods)",
+       subtitle = "Social media: 07:00-08:00 & 19:00-21:00 | Work: 08:00-16:00 | Home: 16:00-19:00 & 21:00-00:00") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Week plot
+week_plot <- analysis_data %>%
+  filter(Type == "Week") %>%
+  ggplot(aes(x = AdjustedTime, y = Proportion, 
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(0, 7, 1), labels = ~paste0(.x, "d")) +
+  labs(x = "Days", title = "Week Simulation (7d)") +
+  theme_minimal()
+
+# Combine plots
+combined_plot <- (day_plot / week_plot) + 
+  plot_layout(guides = "collect") &
+  scale_color_brewer(palette = "Dark2") &
+  scale_fill_brewer(palette = "Dark2") &
+  scale_linetype_manual(values = c("Recovery" = "solid", "Resilience" = "dashed"),
+                        labels = c("Recovery Rate", "Resilience (1 - Believers)")) &
+  theme(legend.position = "top")
+
+# Final plot
+final_plot <- combined_plot + 
+  plot_annotation(
+    title = "Recovery and Resilience Dynamics by Environment and Emotional Valence",
+    subtitle = "Error ribbons show ±1 SE | Work environments show most consistent recovery",
+    theme = theme(plot.title = element_text(size = 16, face = "bold"))
+  )
+
+ggsave("recovery_resilience_time_units_LOL.png", final_plot, width = 14, height = 10, dpi = 300)
+
+```
+
+
+```{r}
+library(tidyverse)
+library(scales)
+library(patchwork)
+
+# Define environment time zones
+environment_time_zones <- tribble(
+  ~Environment, ~Start, ~End,
+  "social_media", "07:00", "08:00",
+  "social_media", "19:00", "21:00",
+  "work", "08:00", "16:00",
+  "home", "16:00", "19:00",
+  "home", "21:00", "00:00"
+) %>%
+  mutate(
+    Start_Time = as.POSIXct(Start, format = "%H:%M"),
+    End_Time = as.POSIXct(End, format = "%H:%M"),
+    Start_Min = as.numeric(difftime(Start_Time, as.POSIXct("00:00", format = "%H:%M"), units = "mins")),
+    End_Min = as.numeric(difftime(End_Time, as.POSIXct("00:00", format = "%H:%M"), units = "mins"))
+  )
+
+# Process data with time unit adjustment
+all_data <- bind_rows(
+  week_data %>% mutate(Type = "Week"),
+  day_data %>% mutate(Type = "Day")
+) %>%
+  mutate(
+    # Extract valence from filename
+    EmotionalValence = case_when(
+      str_detect(Run, "V1_") ~ 1.0,
+      str_detect(Run, "V3_") ~ 3.0,
+      str_detect(Run, "V5_") ~ 5.0,
+      str_detect(Run, "V10_") ~ 10.0,
+      TRUE ~ NA_real_
+    ),
+    Valence = factor(case_when(
+      EmotionalValence <= 3 ~ "Low (1-3)",
+      EmotionalValence <= 7 ~ "Medium (4-7)", 
+      TRUE ~ "High (8-10)"
+    ), levels = c("Low (1-3)", "Medium (4-7)", "High (8-10)")))
+    
+    # Calculate time columns with different units
+    Time_Min = as.numeric(difftime(as.POSIXct(Time, format = "%H:%M"), 
+                         as.POSIXct("00:00", format = "%H:%M"), units = "mins"),
+    
+    # Filter day data to only include relevant times for each environment
+    Active_Period = ifelse(Type == "Week", TRUE,
+      (Environment == "social_media" & (
+        (Time_Min >= 420 & Time_Min < 480) |  # 07:00-08:00
+        (Time_Min >= 1140 & Time_Min < 1260)   # 19:00-21:00
+      )) |
+      (Environment == "work" & Time_Min >= 480 & Time_Min < 960) |  # 08:00-16:00
+      (Environment == "home" & (
+        (Time_Min >= 960 & Time_Min < 1140) |  # 16:00-19:00
+        (Time_Min >= 1260)                     # 21:00-24:00
+      ))
+    ),
+    
+    # Calculate proportions
+    Prop_Recovered = Recovered / (Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant),
+    Prop_Believer = Believer / (Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant)
+  ) %>%
+  filter(Type == "Week" | Active_Period)
+
+# Create adjusted time units for plotting
+all_data <- all_data %>%
+  group_by(Type, Environment) %>%
+  mutate(
+    AdjustedTime = case_when(
+      Type == "Week" ~ Day,
+      Environment == "social_media" & Time_Min >= 420 & Time_Min < 480 ~ Time_Min - 420,
+      Environment == "social_media" & Time_Min >= 1140 ~ Time_Min - 1140 + 60,
+      Environment == "work" ~ Time_Min - 480,
+      Environment == "home" & Time_Min >= 960 & Time_Min < 1140 ~ Time_Min - 960,
+      Environment == "home" & Time_Min >= 1260 ~ Time_Min - 1260 + 180,
+      TRUE ~ NA_real_
+    ),
+    TimeLabel = case_when(
+      Type == "Week" ~ paste0(Day, "d"),
+      Environment == "social_media" & AdjustedTime < 60 ~ 
+        format(as.POSIXct("07:00", format="%H:%M") + AdjustedTime*60, "%H:%M"),
+      Environment == "social_media" & AdjustedTime >= 60 ~ 
+        format(as.POSIXct("19:00", format="%H:%M") + (AdjustedTime-60)*60, "%H:%M"),
+      Environment == "work" ~ 
+        format(as.POSIXct("08:00", format="%H:%M") + AdjustedTime*60, "%H:%M"),
+      Environment == "home" & AdjustedTime < 180 ~ 
+        format(as.POSIXct("16:00", format="%H:%M") + AdjustedTime*60, "%H:%M"),
+      Environment == "home" & AdjustedTime >= 180 ~ 
+        format(as.POSIXct("21:00", format="%H:%M") + (AdjustedTime-180)*60, "%H:%M")
+    )
+  ) %>%
+  ungroup()
+
+# Create analysis dataset
+analysis_data <- all_data %>%
+  group_by(Type, Environment, Valence, AdjustedTime, TimeLabel) %>%
+  summarise(
+    Mean_Recovery = mean(Prop_Recovered, na.rm = TRUE),
+    SE_Recovery = sd(Prop_Recovered, na.rm = TRUE)/sqrt(n()),
+    Mean_Resilience = 1 - mean(Prop_Believer, na.rm = TRUE),
+    SE_Resilience = sd(Prop_Believer, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = starts_with("Mean_"),
+    names_to = "Metric",
+    values_to = "Proportion"
+  ) %>%
+  mutate(
+    SE = ifelse(str_detect(Metric, "Recovery"), SE_Recovery, SE_Resilience),
+    Metric = str_remove(Metric, "Mean_")
+  )
+
+# Create plots for both day and week simulations
+day_plot <- analysis_data %>%
+  filter(Type == "Day") %>%
+  ggplot(aes(x = AdjustedTime, y = Proportion, 
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1, scales = "free_x") +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(
+    breaks = function(x) {
+      env <- unique(analysis_data$Environment[analysis_data$AdjustedTime %in% x & analysis_data$Type == "Day"])
+      if (length(env) == 1) {
+        if (env == "social_media") seq(0, 120, by = 15)
+        else if (env == "work") seq(0, 480, by = 60)
+        else if (env == "home") seq(0, 300, by = 60)
+        else NULL
+      } else NULL
+    },
+    labels = function(x) {
+      env <- unique(analysis_data$Environment[analysis_data$AdjustedTime %in% x & analysis_data$Type == "Day"])
+      if (length(env) == 0) return("")
+      times <- unique(analysis_data$TimeLabel[analysis_data$AdjustedTime %in% x & 
+                                            analysis_data$Type == "Day" & 
+                                            analysis_data$Environment == env])
+      times[seq(1, length(times), length.out = length(x))]
+    }
+  ) +
+  labs(x = "Time of Day", 
+       title = "Day Simulation (Active Time Periods)",
+       subtitle = "Social media: 07:00-08:00 & 19:00-21:00 | Work: 08:00-16:00 | Home: 16:00-19:00 & 21:00-00:00") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.subtitle = element_text(size = 10))
+
+week_plot <- analysis_data %>%
+  filter(Type == "Week") %>%
+  ggplot(aes(x = AdjustedTime, y = Proportion, 
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(0, 7, 1), labels = ~paste0(.x, "d")) +
+  labs(x = "Days", title = "Week Simulation (7d)") +
+  theme_minimal()
+
+# Combine plots with shared legend
+combined_plot <- (day_plot / week_plot) + 
+  plot_layout(guides = "collect") &
+  scale_color_brewer(palette = "Dark2") &
+  scale_fill_brewer(palette = "Dark2") &
+  scale_linetype_manual(values = c("Recovery" = "solid", "Resilience" = "dashed"),
+                        labels = c("Recovery Rate", "Resilience (1 - Believers)")) &
+  labs(y = "Proportion of Population",
+       color = "Emotional Valence",
+       fill = "Emotional Valence",
+       linetype = "Metric") &
+  theme(legend.position = "top",
+        legend.box = "vertical",
+        plot.title = element_text(hjust = 0.5))
+
+# Add global title
+final_plot <- combined_plot + 
+  plot_annotation(
+    title = "Recovery and Resilience Dynamics by Environment and Emotional Valence",
+    subtitle = "Error ribbons show ±1 SE | Work environments show most consistent recovery",
+    theme = theme(plot.title = element_text(size = 16, face = "bold"),
+                  plot.subtitle = element_text(size = 12))
+  )
+
+ggsave("recovery_resilience_time_units.png", final_plot, width = 14, height = 10, dpi = 300)
+```
+
+```{r}
+library(tidyverse)
+library(scales)
+library(patchwork)
+
+# Process data with time unit adjustment
+all_data <- bind_rows(
+  week_data %>% mutate(Type = "Week"),
+  day_data %>% mutate(Type = "Day")
+) %>%
+  mutate(
+    # Extract valence from filename
+    EmotionalValence = case_when(
+      str_detect(Run, "V1_") ~ 1.0,
+      str_detect(Run, "V3_") ~ 3.0,
+      str_detect(Run, "V5_") ~ 5.0,
+      str_detect(Run, "V10_") ~ 10.0,
+      TRUE ~ NA_real_
+    ),
+    Valence = factor(case_when(
+      EmotionalValence <= 3 ~ "Low (1-3)",
+      EmotionalValence <= 7 ~ "Medium (4-7)", 
+      TRUE ~ "High (8-10)"
+    ), levels = c("Low (1-3)", "Medium (4-7)", "High (8-10)")),
+    
+    # Calculate time columns - using your working approach
+    DateTime = as.POSIXct(paste("2023-01-01", as.character(Hour)), format = "%Y-%m-%d %H:%M") + 
+               (Day - 1) * 24 * 60 * 60,
+    Minutes = as.numeric(difftime(DateTime, min(DateTime), units = "mins")),
+    
+    # Different time bins for day vs week
+    TimeUnit = ifelse(Type == "Day", 
+                     floor(Minutes/10),    # 10-minute intervals for day
+                     floor(Minutes/1440)), # Days for week
+    
+    # Calculate proportions
+    Prop_Recovered = Recovered / (Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant),
+    Prop_Believer = Believer / (Susceptible + Exposed + Believer + Doubter + Recovered + Disinformant)
+  )
+
+# Create analysis dataset
+analysis_data <- all_data %>%
+  group_by(Type, Environment, Valence, TimeUnit) %>%
+  summarise(
+    Mean_Recovery = mean(Prop_Recovered, na.rm = TRUE),
+    SE_Recovery = sd(Prop_Recovered, na.rm = TRUE)/sqrt(n()),
+    Mean_Resilience = 1 - mean(Prop_Believer, na.rm = TRUE),
+    SE_Resilience = sd(Prop_Believer, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = starts_with("Mean_"),
+    names_to = "Metric",
+    values_to = "Proportion"
+  ) %>%
+  mutate(
+    SE = ifelse(str_detect(Metric, "Recovery"), SE_Recovery, SE_Resilience),
+    Metric = str_remove(Metric, "Mean_")
+  )
+
+# Create day plot (using hours)
+day_plot <- analysis_data %>%
+  filter(Type == "Day") %>%
+  ggplot(aes(x = TimeUnit/6, y = Proportion,  # Convert to hours
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(0, 24, 4), labels = ~paste0(.x, "h")) +
+  labs(x = "Hours", title = "Day Simulation (24h)") +
+  theme_minimal()
+
+# Create week plot
+week_plot <- analysis_data %>%
+  filter(Type == "Week") %>%
+  ggplot(aes(x = TimeUnit, y = Proportion, 
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(0, 7, 1), labels = ~paste0(.x, "d")) +
+  labs(x = "Days", title = "Week Simulation (7d)") +
+  theme_minimal()
+
+# Combine plots
+combined_plot <- (day_plot / week_plot) + 
+  plot_layout(guides = "collect") &
+  scale_color_brewer(palette = "Dark2") &
+  scale_fill_brewer(palette = "Dark2") &
+  scale_linetype_manual(values = c("Recovery" = "solid", "Resilience" = "dashed"),
+                        labels = c("Recovery Rate", "Resilience (1 - Believers)")) &
+  labs(y = "Proportion of Population",
+       color = "Emotional Valence",
+       fill = "Emotional Valence",
+       linetype = "Metric") &
+  theme(legend.position = "top",
+        legend.box = "vertical",
+        plot.title = element_text(hjust = 0.5))
+
+# Add global title
+final_plot <- combined_plot + 
+  plot_annotation(
+    title = "Recovery and Resilience Dynamics by Environment and Emotional Valence",
+    subtitle = "Error ribbons show ±1 SE | Work environments show most consistent recovery",
+    theme = theme(plot.title = element_text(size = 16, face = "bold"),
+                  plot.subtitle = element_text(size = 12))
+  )
+
+ggsave("recovery_resilience_time_units.png", final_plot, width = 14, height = 10, dpi = 300)
+```
+
+
+```{r}
+# First, verify we have data for all environments
+check_data <- analysis_data %>%
+  filter(Type == "Day") %>%
+  group_by(Environment) %>%
+  summarise(has_data = n() > 0)
+
+# Filter out environments with no data for day plot
+valid_envs <- check_data$Environment[check_data$has_data]
+
+# Update day plot to only include environments with data
+day_plot <- analysis_data %>%
+  filter(Type == "Day", Environment %in% valid_envs) %>%
+  ggplot(aes(x = AdjustedTime, y = Proportion, 
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  {if(length(valid_envs) > 0) facet_wrap(~ Environment, nrow = 1, scales = "free_x")} +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(
+    breaks = function(x) {
+      env <- unique(analysis_data$Environment[analysis_data$AdjustedTime %in% x & 
+                                             analysis_data$Type == "Day" & 
+                                             analysis_data$Environment %in% valid_envs])
+      if (length(env) == 1) day_breaks[[env]] else NULL
+    },
+    labels = function(x) {
+      env <- unique(analysis_data$Environment[analysis_data$AdjustedTime %in% x & 
+                                            analysis_data$Type == "Day" & 
+                                            analysis_data$Environment %in% valid_envs])
+      if (length(env) == 0) return("")
+      
+      times <- unique(analysis_data$TimeLabel[analysis_data$AdjustedTime %in% x & 
+                                            analysis_data$Type == "Day" & 
+                                            analysis_data$Environment == env])
+      times[seq(1, length(times), length.out = length(x))]
+    }
+  ) +
+  labs(x = "Time of Day", 
+       title = "Day Simulation Showing Active Time Periods by Environment",
+       subtitle = "Social media: 07:00-08:00 & 19:00-21:00 | Work: 08:00-16:00 | Home: 16:00-19:00 & 21:00-00:00") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.subtitle = element_text(size = 10))
+
+# Update week plot similarly if needed
+week_valid_envs <- analysis_data %>%
+  filter(Type == "Week") %>%
+  group_by(Environment) %>%
+  summarise(has_data = n() > 0) %>%
+  filter(has_data) %>%
+  pull(Environment)
+
+week_plot <- analysis_data %>%
+  filter(Type == "Week", Environment %in% week_valid_envs) %>%
+  ggplot(aes(x = AdjustedTime, y = Proportion, 
+             color = Valence, linetype = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Proportion - SE, ymax = Proportion + SE, fill = Valence), 
+              alpha = 0.15, color = NA) +
+  {if(length(week_valid_envs)) facet_wrap(~ Environment, nrow = 1)} +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(0, 7, 1), labels = ~paste0(.x, "d")) +
+  labs(x = "Days", title = "Week Simulation (7d)") +
+  theme_minimal()
+
+# Only combine plots if we have data for at least one environment
+if(length(valid_envs) > 0 | length(week_valid_envs) > 0) {
+  combined_plot <- (if(length(valid_envs)) day_plot else NULL) / 
+                   (if(length(week_valid_envs)) week_plot else NULL) + 
+    plot_layout(guides = "collect") &
+    scale_color_brewer(palette = "Dark2") &
+    scale_fill_brewer(palette = "Dark2") &
+    scale_linetype_manual(values = c("Recovery" = "solid", "Resilience" = "dashed"),
+                          labels = c("Recovery Rate", "Resilience (1 - Believers)")) &
+    labs(y = "Proportion of Population",
+         color = "Emotional Valence",
+         fill = "Emotional Valence",
+         linetype = "Metric") &
+    theme(legend.position = "top",
+          legend.box = "vertical",
+          plot.title = element_text(hjust = 0.5))
+  
+  # Add global title if we have any plots
+  if(!is.null(combined_plot)) {
+    final_plot <- combined_plot + 
+      plot_annotation(
+        title = "Recovery and Resilience Dynamics by Environment and Emotional Valence",
+        subtitle = "Error ribbons show ±1 SE | Work environments show most consistent recovery",
+        theme = theme(plot.title = element_text(size = 16, face = "bold"),
+                      plot.subtitle = element_text(size = 12))
+      )
+    
+    ggsave("recovery_resilience_time_units_final.png", final_plot, width = 16, height = 10, dpi = 300)
+  } else {
+    message("No data available for any environment - plot not generated")
+  }
+} else {
+  message("No data available for any environment - plot not generated")
+}
+
+```
+
+```{r}
+library(tidyverse)
+library(scales)
+library(patchwork)  # For combining subplots
+
+# --- Data Prep ---
+# Add emotional valence labels (assuming 'all_data' has a column `EmotionalValence`)
+plot_data <- all_data %>%
+  mutate(
+    Valence = factor(case_when(
+      EmotionalValence <= 3 ~ "Low",
+      EmotionalValence <= 7 ~ "Medium",
+      TRUE ~ "High"
+    ), levels = c("Low", "Medium", "High"))
+  ) %>%
+  group_by(Environment, Valence, Minutes) %>%
+  summarise(
+    mean_recovered = mean(Prop_Recovered, na.rm = TRUE),
+    se_recovered = sd(Prop_Recovered, na.rm = TRUE) / sqrt(n()),
+    mean_believers = mean(Prop_Believer, na.rm = TRUE),
+    se_believers = sd(Prop_Believer, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# --- Main Plot ---
+main_plot <- ggplot(plot_data, aes(x = Minutes, color = Valence, fill = Valence)) +
+  # Recovery trajectories
+  geom_line(aes(y = mean_recovered, linetype = "Recovery"), size = 1.2) +
+  geom_ribbon(aes(y = mean_recovered, ymin = mean_recovered - se_recovered, 
+                  ymax = mean_recovered + se_recovered), alpha = 0.1, color = NA) +
+  # Resilience trajectories
+  geom_line(aes(y = mean_believers, linetype = "Resilience"), size = 1.2) +
+  geom_ribbon(aes(y = mean_believers, ymin = mean_believers - se_believers, 
+                  ymax = mean_believers + se_believers), alpha = 0.1, color = NA) +
+  # Styling
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_y_continuous(labels = percent_format(accuracy = 1), 
+                     sec.axis = dup_axis(name = NULL)) +
+  scale_color_viridis_d(option = "plasma", end = 0.9) +
+  scale_fill_viridis_d(option = "plasma", end = 0.9) +
+  scale_linetype_manual(values = c("Recovery" = "solid", "Resilience" = "dashed")) +
+  labs(
+    title = "Recovery and Resilience Dynamics by Environment and Emotional Valence",
+    subtitle = "Solid = Recovery (fact-checking) | Dashed = Resilience (believer decline)\nShaded regions = ±1 SE",
+    x = "Minutes since simulation start",
+    y = "Proportion of Agents",
+    color = "Emotional Valence",
+    fill = "Emotional Valence",
+    linetype = NULL
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "top",
+    panel.spacing = unit(1.5, "lines"),
+    strip.text = element_text(face = "bold"),
+    axis.title.y.right = element_blank()
+  )
+
+# --- Inset: Key Transitions ---
+# Summarize critical transitions (e.g., Believer → Recovered)
+transitions <- all_data %>%
+  group_by(Environment, Valence) %>%
+  summarise(
+    Recovery_Rate = sum(Recovered) / max(Minutes),  # Events per minute
+    .groups = "drop"
+  )
+
+inset_plot <- ggplot(transitions, aes(x = Valence, y = Recovery_Rate, fill = Valence)) +
+  geom_col(alpha = 0.8) +
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_fill_viridis_d(option = "plasma", end = 0.9) +
+  labs(
+    x = NULL,
+    y = "Recovery Rate (events/min)",
+    title = "Key Transition: Believer → Recovered"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.background = element_blank(),
+    strip.text = element_blank()
+  )
+
+# --- Combine Plots ---
+final_plot <- main_plot + 
+  inset_element(inset_plot, left = 0.4, right = 0.98, bottom = 0.6, top = 0.95) +
+  plot_annotation(theme = theme(plot.margin = margin(10, 10, 10, 10)))
+
+# Save
+ggsave("recovery_resilience_enhanced.png", final_plot, width = 12, height = 6, dpi = 300)
+```
+
+
+```{r}
+library(tidyverse)
+library(scales)
+
+# Data preparation (assuming 'all_data' is loaded from simulations)
+plot_data <- all_data %>%
+  group_by(Environment, Minutes) %>%
+  summarise(
+    mean_recovered = mean(Prop_Recovered, na.rm = TRUE),
+    se_recovered = sd(Prop_Recovered, na.rm = TRUE) / sqrt(n()),
+    mean_believers = mean(Prop_Believer, na.rm = TRUE),
+    se_believers = sd(Prop_Believer, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = c(mean_recovered, mean_believers),
+    names_to = "Metric",
+    values_to = "Mean"
+  ) %>%
+  mutate(
+    Metric = recode(Metric, 
+                    mean_recovered = "Recovery (Fact-Checked)", 
+                    mean_believers = "Resilience (Believers)"),
+    SE = case_when(
+      Metric == "Recovery (Fact-Checked)" ~ se_recovered,
+      Metric == "Resilience (Believers)" ~ se_believers
+    )
+  )
+
+# Plot
+ggplot(plot_data, aes(x = Minutes, y = Mean, color = Metric, fill = Metric)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Mean - SE, ymax = Mean + SE), alpha = 0.15, color = NA) +
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  scale_color_manual(values = c("Recovery (Fact-Checked)" = "#1B9E77", 
+                               "Resilience (Believers)" = "#D95F02")) +
+  scale_fill_manual(values = c("Recovery (Fact-Checked)" = "#1B9E77", 
+                              "Resilience (Believers)" = "#D95F02")) +
+  labs(
+    title = "Recovery and Resilience Dynamics by Environment",
+    subtitle = "Mean ± SE | Work environments show faster recovery; social media delays correction",
+    x = "Minutes since simulation start",
+    y = "Proportion of Agents",
+    color = NULL,
+    fill = NULL
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "top",
+    panel.spacing = unit(1.5, "lines"),
+    strip.text = element_text(face = "bold")
+  )
+
+ggsave("my_last_plot.png", width = 10, height = 6, dpi = 300)
+
+```
+
+```{r}
+# Create summary statistics using aggregate()
+env_summary <- aggregate(cbind(Prop_Recovered, Prop_Believer) ~ Environment + Time, 
+                        data = all_data,
+                        FUN = function(x) c(mean = mean(x), se = sd(x)/sqrt(length(x))))
+
+# Reshape data for plotting
+plot_data <- data.frame(
+  Environment = rep(env_summary$Environment, 2),
+  Time = rep(env_summary$Time, 2),
+  Metric = rep(c("Recovery", "Resilience"), each = nrow(env_summary)),
+  Mean = c(env_summary$Prop_Recovered[,1], env_summary$Prop_Believer[,1]),
+  SE = c(env_summary$Prop_Recovered[,2], env_summary$Prop_Believer[,2])
+)
+
+# Create dual-axis visualization
+# Revised visualization code without scale conflicts
+ggplot(plot_data, aes(x = Time)) +
+  geom_ribbon(aes(ymin = Mean - SE, ymax = Mean + SE, fill = Metric), alpha = 0.15) +
+  geom_line(aes(y = Mean, color = Metric), linewidth = 1) +
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_y_continuous(
+    labels = scales::percent_format(),
+    name = "Proportion of Agents"
+  ) +
+  scale_color_manual(
+    name = "Metric",
+    values = c("Recovery" = "#1B9E77", "Resilience" = "#D95F02")
+  ) +
+  scale_fill_manual(
+    name = "Metric",
+    values = c("Recovery" = "#1B9E77", "Resilience" = "#D95F02")
+  ) +
+  labs(
+    title = "Environmental Impact on Misinformation Dynamics",
+    subtitle = "Ribbons = ±1 SE | Recovery: Fact-checked agents | Resilience: Believer decline",
+    x = "Simulation Time"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "top",
+    panel.spacing = unit(15, "points"),
+    strip.text = element_text(face = "bold", size = 12),
+    legend.margin = margin(t = 0, unit = "pt")
+  )
+
+ggsave("my_last_plot.png", width = 10, height = 6, dpi = 300)
+```
+
+
+```{r}
+# ---- 3. Compute State Transitions ----
+
+# We'll focus on these states: Susceptible, Exposed, Believer, Doubter, Recovered
+state_names <- c("Susceptible", "Exposed", "Believer", "Doubter", "Recovered")
+
+# Add lagged columns for each state, grouped by Run (to avoid crossing run boundaries)
+all_data <- all_data %>%
+  arrange(Run, Minutes) %>%
+  group_by(Run) %>%
+  mutate(
+    Susceptible_prev = lag(Susceptible, default = Susceptible[1]),
+    Exposed_prev     = lag(Exposed, default = Exposed[1]),
+    Believer_prev    = lag(Believer, default = Believer[1]),
+    Doubter_prev     = lag(Doubter, default = Doubter[1]),
+    Recovered_prev   = lag(Recovered, default = Recovered[1])
+  ) %>%
+  ungroup()
+
+# Compute net changes for each state at each step
+all_data <- all_data %>%
+  mutate(
+    dSusceptible = Susceptible - Susceptible_prev,
+    dExposed     = Exposed - Exposed_prev,
+    dBeliever    = Believer - Believer_prev,
+    dDoubter     = Doubter - Doubter_prev,
+    dRecovered   = Recovered - Recovered_prev
+  )
+
+# ---- 4. Estimate Main Transitions ----
+# For Sankey, we'll focus on the most interpretable transitions:
+# Susceptible -> Exposed, Exposed -> Believer, Believer -> Recovered, Believer -> Doubter, Doubter -> Recovered
+
+# Calculate positive transitions only (no negative flows)
+all_data <- all_data %>%
+  mutate(
+    Susceptible_to_Exposed = pmax(0, -dSusceptible), # Susceptible decreases
+    Exposed_to_Believer    = pmax(0, -dExposed),     # Exposed decreases
+    Believer_to_Recovered  = pmax(0, dRecovered),    # Recovered increases (from Believer)
+    Believer_to_Doubter    = pmax(0, dDoubter),      # Doubter increases (from Believer)
+    Doubter_to_Recovered   = pmax(0, dRecovered - Believer_to_Recovered) # Remaining Recovered increase from Doubter
+  )
+
+# ---- 5. Gather Transitions for Sankey ----
+
+transition_long <- all_data %>%
+  select(Environment, Run, Susceptible_to_Exposed, Exposed_to_Believer, 
+         Believer_to_Recovered, Believer_to_Doubter, Doubter_to_Recovered) %>%
+  pivot_longer(
+    cols = starts_with(c("Susceptible_to", "Exposed_to", "Believer_to", "Doubter_to")),
+    names_to = "Transition", values_to = "Count"
+  ) %>%
+  filter(Count > 0)
+
+# Map transition names to source/target
+transition_long <- transition_long %>%
+  mutate(
+    Source = case_when(
+      Transition == "Susceptible_to_Exposed" ~ "Susceptible",
+      Transition == "Exposed_to_Believer" ~ "Exposed",
+      Transition == "Believer_to_Recovered" ~ "Believer",
+      Transition == "Believer_to_Doubter" ~ "Believer",
+      Transition == "Doubter_to_Recovered" ~ "Doubter"
+    ),
+    Target = case_when(
+      Transition == "Susceptible_to_Exposed" ~ "Exposed",
+      Transition == "Exposed_to_Believer" ~ "Believer",
+      Transition == "Believer_to_Recovered" ~ "Recovered",
+      Transition == "Believer_to_Doubter" ~ "Doubter",
+      Transition == "Doubter_to_Recovered" ~ "Recovered"
+    )
+  )
+
+# ---- 6. Aggregate for Sankey Diagram ----
+
+# Aggregate over all runs for each environment
+sankey_data <- transition_long %>%
+  group_by(Environment, Source, Target) %>%
+  summarise(Count = sum(Count), .groups = "drop")
+
+# ---- 7. Plot Sankey Diagrams by Environment ----
+
+# Prepare node list
+nodes <- data.frame(name = state_names)
+
+# Function to plot Sankey for a given environment
+plot_sankey_env <- function(env) {
+  env_links <- sankey_data %>%
+    filter(Environment == env) %>%
+    mutate(
+      source = match(Source, nodes$name) - 1,
+      target = match(Target, nodes$name) - 1
+    ) %>%
+    select(source, target, value = Count)
+  
+  sankeyNetwork(
+    Links = env_links,
+    Nodes = nodes,
+    Source = "source",
+    Target = "target",
+    Value = "value",
+    NodeID = "name",
+    fontSize = 14,
+    nodeWidth = 30,
+    sinksRight = FALSE
+  )
+}
+
+# Plot for each environment (will open in Viewer or browser)
+unique_envs <- unique(sankey_data$Environment)
+for (env in unique_envs) {
+  cat("Sankey diagram for environment:", env, "\n")
+  print(plot_sankey_env(env))
+}
+
+# ---- 8. (Optional) Save Sankey as HTML ----
+# library(htmlwidgets)
+# saveNetwork(plot_sankey_env("work"), "sankey_work.html")
+
+# ---- 9. (Optional) Markov Transition Matrix ----
+
+# Example for all environments combined
+transitions_matrix <- sankey_data %>%
+  group_by(Source, Target) %>%
+  summarise(Total = sum(Count), .groups = "drop") %>%
+  pivot_wider(names_from = Target, values_from = Total, values_fill = 0) %>%
+  column_to_rownames("Source")
+print(transitions_matrix)
+
+# Normalize to get probabilities
+transition_probs <- transitions_matrix / rowSums(transitions_matrix)
+print(round(transition_probs, 2))
+```
+
+```{r}
+# ---- Libraries ----
+library(tidyverse)
+library(lubridate)
+library(networkD3)
+library(scales)
+
+# ---- 1. Prepare Data ----
+
+# If not already present, create DateTime and Minutes columns
+if(!"DateTime" %in% names(all_data)) {
+  all_data$DateTime <- as.POSIXct(
+    paste("2023-01-01", all_data$Time), format = "%Y-%m-%d %H:%M"
+  ) + (all_data$Day - 1) * 24 * 60 * 60
+}
+if(!"Minutes" %in% names(all_data)) {
+  all_data$Minutes <- as.numeric(difftime(all_data$DateTime, min(all_data$DateTime), units = "mins"))
+}
+
+# Calculate proportions
+all_data$TotalAgents <- all_data$Susceptible + all_data$Exposed + all_data$Believer +
+                        all_data$Doubter + all_data$Recovered + all_data$Disinformant
+all_data$Prop_Recovered <- all_data$Recovered / all_data$TotalAgents
+all_data$Prop_Believer <- all_data$Believer / all_data$TotalAgents
+all_data$Prop_Doubter <- all_data$Doubter / all_data$TotalAgents
+all_data$Prop_Susceptible <- all_data$Susceptible / all_data$TotalAgents
+all_data$Prop_Exposed <- all_data$Exposed / all_data$TotalAgents
+
+# ---- 2. Sankey Diagram for All Transitions ----
+
+# Compute lagged values for transitions (grouped by Run to avoid crossing runs)
+all_data <- all_data %>%
+  arrange(Run, Minutes) %>%
+  group_by(Run) %>%
+  mutate(
+    Susceptible_prev = lag(Susceptible, default = Susceptible[1]),
+    Exposed_prev     = lag(Exposed, default = Exposed[1]),
+    Believer_prev    = lag(Believer, default = Believer[1]),
+    Doubter_prev     = lag(Doubter, default = Doubter[1]),
+    Recovered_prev   = lag(Recovered, default = Recovered[1])
+  ) %>%
+  ungroup()
+
+# Calculate net changes for each state at each step
+all_data <- all_data %>%
+  mutate(
+    dSusceptible = Susceptible - Susceptible_prev,
+    dExposed     = Exposed - Exposed_prev,
+    dBeliever    = Believer - Believer_prev,
+    dDoubter     = Doubter - Doubter_prev,
+    dRecovered   = Recovered - Recovered_prev
+  )
+
+# Main transitions (positive flows only)
+all_data <- all_data %>%
+  mutate(
+    Susceptible_to_Exposed = pmax(0, -dSusceptible),
+    Exposed_to_Believer    = pmax(0, -dExposed),
+    Believer_to_Recovered  = pmax(0, dRecovered),
+    Believer_to_Doubter    = pmax(0, dDoubter),
+    Doubter_to_Recovered   = pmax(0, dRecovered - Believer_to_Recovered)
+  )
+
+# Gather transitions for Sankey
+transition_long <- all_data %>%
+  select(Susceptible_to_Exposed, Exposed_to_Believer, 
+         Believer_to_Recovered, Believer_to_Doubter, Doubter_to_Recovered) %>%
+  summarise_all(sum, na.rm = TRUE) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "Transition", values_to = "Count"
+  ) %>%
+  filter(Count > 0)
+
+# Map transition names to source/target
+transition_long <- transition_long %>%
+  mutate(
+    Source = case_when(
+      Transition == "Susceptible_to_Exposed" ~ "Susceptible",
+      Transition == "Exposed_to_Believer" ~ "Exposed",
+      Transition == "Believer_to_Recovered" ~ "Believer",
+      Transition == "Believer_to_Doubter" ~ "Believer",
+      Transition == "Doubter_to_Recovered" ~ "Doubter"
+    ),
+    Target = case_when(
+      Transition == "Susceptible_to_Exposed" ~ "Exposed",
+      Transition == "Exposed_to_Believer" ~ "Believer",
+      Transition == "Believer_to_Recovered" ~ "Recovered",
+      Transition == "Believer_to_Doubter" ~ "Doubter",
+      Transition == "Doubter_to_Recovered" ~ "Recovered"
+    )
+  )
+
+# Sankey node list
+state_names <- c("Susceptible", "Exposed", "Believer", "Doubter", "Recovered")
+nodes <- data.frame(name = state_names)
+
+# Sankey links
+links <- transition_long %>%
+  mutate(
+    source = match(Source, nodes$name) - 1,
+    target = match(Target, nodes$name) - 1
+  ) %>%
+  select(source, target, value = Count)
+
+# Plot Sankey
+sankeyNetwork(
+  Links = links,
+  Nodes = nodes,
+  Source = "source",
+  Target = "target",
+  Value = "value",
+  NodeID = "name",
+  fontSize = 14,
+  nodeWidth = 30,
+  sinksRight = FALSE
+)
+
+# ---- 3. Best ggplots for Agent-Based Misinformation Dynamics ----
+
+# 3A. Proportion of Each State Over Time (Stacked Area)
+all_data_long <- all_data %>%
+  select(Minutes, Run, Environment, Prop_Susceptible, Prop_Exposed, Prop_Believer, Prop_Doubter, Prop_Recovered) %>%
+  pivot_longer(cols = starts_with("Prop_"), names_to = "State", values_to = "Proportion") %>%
+  mutate(State = recode(State,
+                        Prop_Susceptible = "Susceptible",
+                        Prop_Exposed = "Exposed",
+                        Prop_Believer = "Believer",
+                        Prop_Doubter = "Doubter",
+                        Prop_Recovered = "Recovered"))
+
+ggplot(all_data_long, aes(x = Minutes, y = Proportion, fill = State)) +
+  geom_area(position = "stack", alpha = 0.8) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Agent State Proportions Over Time (All Runs)",
+       x = "Minutes since start", y = "Proportion of Agents") +
+  theme_minimal()
+
+# 3B. Proportion Recovered Over Time by Environment (Mean + Ribbon)
+all_data_summary <- all_data %>%
+  group_by(Minutes, Environment) %>%
+  summarise(
+    mean_recovered = mean(Prop_Recovered, na.rm = TRUE),
+    sd_recovered = sd(Prop_Recovered, na.rm = TRUE),
+    n = n(),
+    se_recovered = sd_recovered / sqrt(n)
+  )
+
+ggplot(all_data_summary, aes(x = Minutes, y = mean_recovered, color = Environment, fill = Environment)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = mean_recovered - se_recovered, ymax = mean_recovered + se_recovered), alpha = 0.2, color = NA) +
+  labs(title = "Mean Proportion Recovered Over Time by Environment",
+       x = "Minutes since start", y = "Mean Proportion Recovered") +
+  theme_minimal()
+
+# 3C. Time to First Recovery by Environment (Boxplot)
+first_recovery <- all_data %>%
+  filter(Recovered > 0) %>%
+  group_by(Run, Environment) %>%
+  summarise(Time_to_First_Recovery = min(Minutes), .groups = "drop")
+
+ggplot(first_recovery, aes(x = Environment, y = Time_to_First_Recovery, fill = Environment)) +
+  geom_boxplot() +
+  labs(title = "Time to First Recovery by Environment",
+       x = "Environment", y = "Minutes to First Recovery") +
+  theme_minimal()
+
+# 3D. Number of Believers Over Time by Environment (Line Plot)
+all_data_believer <- all_data %>%
+  group_by(Minutes, Environment) %>%
+  summarise(mean_believers = mean(Believer, na.rm = TRUE))
+
+ggplot(all_data_believer, aes(x = Minutes, y = mean_believers, color = Environment)) +
+  geom_line(size = 1) +
+  labs(title = "Mean Number of Believers Over Time by Environment",
+       x = "Minutes since start", y = "Mean Number of Believers") +
+  theme_minimal()
+
+# 3E. State Transition Heatmap (Markov Matrix)
+# Compute transitions
+transition_matrix <- transition_long %>%
+  group_by(Source, Target) %>%
+  summarise(Total = sum(Count), .groups = "drop") %>%
+  pivot_wider(names_from = Target, values_from = Total, values_fill = 0) %>%
+  column_to_rownames("Source")
+
+# Normalize to get probabilities
+transition_probs <- transition_matrix / rowSums(transition_matrix)
+
+# Convert to long format for heatmap
+transition_probs_long <- as.data.frame(as.table(as.matrix(transition_probs)))
+colnames(transition_probs_long) <- c("From", "To", "Probability")
+
+ggplot(transition_probs_long, aes(x = From, y = To, fill = Probability)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(labels = percent_format(accuracy = 1)) +
+  labs(title = "State Transition Probabilities (Markov Matrix)",
+       x = "From State", y = "To State", fill = "Probability") +
+  theme_minimal()
+
+# ---- END ----
+
+```
+
+```{r}
+# Calculate mean and CI for each group
+believer_summary <- all_data %>%
+  group_by(Type, Environment, Minutes) %>%
+  summarise(
+    mean_believers = mean(Prop_Believer, na.rm = TRUE),
+    sd_believers = sd(Prop_Believer, na.rm = TRUE),
+    n = n(),
+    se_believers = sd_believers / sqrt(n)
+  ) %>%
+  ungroup()
+
+ggplot(believer_summary, aes(x = Minutes, y = mean_believers, color = Environment, fill = Environment)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = mean_believers - se_believers, ymax = mean_believers + se_believers), alpha = 0.18, color = NA) +
+  facet_wrap(~Type, scales = "free_x") +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  labs(
+    title = "Resilience: Decline of Believers Over Time",
+    subtitle = "By Environment and Simulation Type",
+    x = "Minutes since start",
+    y = "Mean Proportion of Believers"
+  ) +
+  theme_minimal(base_size = 14)
+
+ggsave("my_last_plot.png", width = 8, height = 5, dpi = 300)
+
+```
+
+```{r}
+recovered_summary <- all_data %>%
+  group_by(Type, Environment, Minutes) %>%
+  summarise(
+    mean_recovered = mean(Prop_Recovered, na.rm = TRUE),
+    sd_recovered = sd(Prop_Recovered, na.rm = TRUE),
+    n = n(),
+    se_recovered = sd_recovered / sqrt(n)
+  ) %>%
+  ungroup()
+
+ggplot(recovered_summary, aes(x = Minutes, y = mean_recovered, color = Environment, fill = Environment)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = mean_recovered - se_recovered, ymax = mean_recovered + se_recovered), alpha = 0.18, color = NA) +
+  facet_wrap(~Type, scales = "free_x") +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  labs(
+    title = "Recovery: Proportion Recovered Over Time",
+    subtitle = "By Environment and Simulation Type",
+    x = "Minutes since start",
+    y = "Mean Proportion Recovered"
+  ) +
+  theme_minimal(base_size = 14)
+
+ggsave("my_last_plot.png", width = 8, height = 5, dpi = 300)
+
+```
+
+```{r}
+final_believers <- all_data %>%
+  group_by(Type, Environment, Run) %>%
+  filter(Minutes == max(Minutes)) %>%
+  summarise(Final_Believers = mean(Prop_Believer, na.rm = TRUE), .groups = "drop")
+
+ggplot(final_believers, aes(x = Environment, y = Final_Believers, fill = Environment)) +
+  geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+  facet_wrap(~Type) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  labs(
+    title = "Final Proportion of Believers (Resilience)",
+    x = "Environment", y = "Final Proportion Believers"
+  ) +
+  theme_minimal(base_size = 14)
+
+ggsave("my_last_plot.png", width = 8, height = 5, dpi = 300)
+
+```
+
+```{r}
+final_recovered <- all_data %>%
+  group_by(Type, Environment, Run) %>%
+  filter(Minutes == max(Minutes)) %>%
+  summarise(Final_Recovered = mean(Prop_Recovered, na.rm = TRUE), .groups = "drop")
+
+ggplot(final_recovered, aes(x = Environment, y = Final_Recovered, fill = Environment)) +
+  geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+  facet_wrap(~Type) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  labs(
+    title = "Final Proportion of Recovered Agents",
+    x = "Environment", y = "Final Proportion Recovered"
+  ) +
+  theme_minimal(base_size = 14)
+
+```
+```{r}
+first_recovery <- all_data %>%
+  filter(Recovered > 0) %>%
+  group_by(Type, Environment, Run) %>%
+  summarise(Time_to_First_Recovery = min(Minutes), .groups = "drop")
+
+ggplot(first_recovery, aes(x = Environment, y = Time_to_First_Recovery, fill = Environment)) +
+  geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+  facet_wrap(~Type) +
+  labs(
+    title = "Time to First Recovery by Environment and Simulation Type",
+    x = "Environment", y = "Minutes to First Recovery"
+  ) +
+  theme_minimal(base_size = 14)
+
+```
+```{r}
+summary_table <- final_recovered %>%
+  left_join(final_believers, by = c("Type", "Environment", "Run")) %>%
+  group_by(Type, Environment) %>%
+  summarise(
+    Mean_Final_Recovered = mean(Final_Recovered, na.rm = TRUE),
+    SD_Final_Recovered = sd(Final_Recovered, na.rm = TRUE),
+    Mean_Final_Believers = mean(Final_Believers, na.rm = TRUE),
+    SD_Final_Believers = sd(Final_Believers, na.rm = TRUE),
+    .groups = "drop"
+  )
+print(summary_table)
+
+```
+```{r}
+library(tidyverse)
+library(scales)
+
+library(tidyverse)
+library(scales)
+
+# 1. Summarize means and SEs for Believers and Recovered
+summary_df <- all_data %>%
+  group_by(Type, Environment, Minutes) %>%
+  summarise(
+    mean_believers = mean(Believer / TotalAgents, na.rm = TRUE),
+    se_believers = sd(Believer / TotalAgents, na.rm = TRUE) / sqrt(n()),
+    mean_recovered = mean(Recovered / TotalAgents, na.rm = TRUE),
+    se_recovered = sd(Recovered / TotalAgents, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# 2. Pivot longer for plotting
+plot_df <- summary_df %>%
+  select(Type, Environment, Minutes,
+         mean_believers, se_believers, mean_recovered, se_recovered) %>%
+  pivot_longer(
+    cols = starts_with("mean_"),
+    names_to = "State",
+    values_to = "Mean"
+  ) %>%
+  mutate(
+    SE = case_when(
+      State == "mean_believers" ~ summary_df$se_believers,
+      State == "mean_recovered" ~ summary_df$se_recovered
+    ),
+    State = recode(State,
+                   mean_believers = "Believer",
+                   mean_recovered = "Recovered")
+  )
+
+# 3. Plot: Dual lines with ribbons, faceted by Environment and Type
+ggplot(plot_df, aes(x = Minutes, y = Mean, color = State, fill = State)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = Mean - SE, ymax = Mean + SE), alpha = 0.18, color = NA) +
+  scale_color_manual(values = c("Believer" = "#D95F02", "Recovered" = "#1B9E77")) +
+  scale_fill_manual(values = c("Believer" = "#D95F02", "Recovered" = "#1B9E77")) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  facet_grid(Type ~ Environment) +
+  labs(
+    title = "Recovery and Resilience Dynamics Across Environments and Simulation Types",
+    subtitle = "Mean ± SE of Believers and Recovered over Time (ABM Output)",
+    x = "Minutes since start",
+    y = "Proportion of Agents",
+    color = "State",
+    fill = "State"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(legend.position = "top")
+
+```
+
+# All in one plot
+```{r}
+library(tidyverse)
+library(scales)
+
+# 1. Summarize means and SEs for Believers and Recovered
+summary_df <- all_data %>%
+  group_by(Type, Environment, Minutes) %>%
+  summarise(
+    mean_believers = mean(Believer / TotalAgents, na.rm = TRUE),
+    se_believers = sd(Believer / TotalAgents, na.rm = TRUE) / sqrt(n()),
+    mean_recovered = mean(Recovered / TotalAgents, na.rm = TRUE),
+    se_recovered = sd(Recovered / TotalAgents, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# 2. Pivot to long format for plotting (no mutate)
+plot_df <- summary_df %>%
+  select(Type, Environment, Minutes,
+         mean_believers, se_believers, mean_recovered, se_recovered) %>%
+  pivot_longer(
+    cols = c(mean_believers, mean_recovered, se_believers, se_recovered),
+    names_to = c("stat", "state"),
+    names_pattern = "(mean|se)_(believers|recovered)"
+  ) %>%
+  pivot_wider(
+    names_from = stat,
+    values_from = value
+  ) %>%
+  mutate(
+    State = recode(state, believers = "Believer", recovered = "Recovered")
+  )
+
+# 3. Plot: Dual lines with ribbons, faceted by Environment and Type
+ggplot(plot_df, aes(x = Minutes, y = mean, color = State, fill = State)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = mean - se, ymax = mean + se), alpha = 0.18, color = NA) +
+  scale_color_manual(values = c("Believer" = "#D95F02", "Recovered" = "#1B9E77")) +
+  scale_fill_manual(values = c("Believer" = "#D95F02", "Recovered" = "#1B9E77")) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  facet_grid(Type ~ Environment) +
+  labs(
+    title = "Recovery and Resilience Dynamics Across Environments and Simulation Types",
+    subtitle = "Mean ± SE of Believers and Recovered over Time (ABM Output)",
+    x = "Minutes since start",
+    y = "Proportion of Agents",
+    color = "State",
+    fill = "State"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(legend.position = "top")
+
+ggsave("my_last_plot.png", width = 8, height = 5, dpi = 300)
+
+```
+
+# Separated plot
+```{r}
+
+library(tidyverse)
+library(scales)
+
+# 1. Summarize means and SEs for Believers and Recovered (same as before)
+summary_df <- all_data %>%
+  group_by(Type, Environment, Minutes) %>%
+  summarise(
+    mean_believers = mean(Believer / TotalAgents, na.rm = TRUE),
+    se_believers = sd(Believer / TotalAgents, na.rm = TRUE) / sqrt(n()),
+    mean_recovered = mean(Recovered / TotalAgents, na.rm = TRUE),
+    se_recovered = sd(Recovered / TotalAgents, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  )
+
+# 2. Pivot to long format for plotting (no mutate)
+plot_df <- summary_df %>%
+  pivot_longer(
+    cols = c(mean_believers, mean_recovered, se_believers, se_recovered),
+    names_to = c("stat", "state"),
+    names_pattern = "(mean|se)_(believers|recovered)"
+  ) %>%
+  pivot_wider(
+    names_from = stat,
+    values_from = value
+  ) %>%
+  mutate(
+    State = recode(state, believers = "Believer", recovered = "Recovered")
+  )
+
+# 3. Create separate plots for Day and Week
+
+## ---- DAY plot ----
+plot_day <- plot_df %>%
+  filter(Type == "Day") %>%
+  ggplot(aes(x = Minutes, y = mean, color = State, fill = State)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = mean - se, ymax = mean + se), alpha = 0.18, color = NA) +
+  scale_color_manual(values = c("Believer" = "#D95F02", "Recovered" = "#1B9E77")) +
+  scale_fill_manual(values = c("Believer" = "#D95F02", "Recovered" = "#1B9E77")) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  facet_wrap(~ Environment) +
+  labs(
+    title = "Recovery and Resilience Dynamics — Day Simulation",
+    subtitle = "Mean ± SE of Believers and Recovered over Time (ABM Output)",
+    x = "Minutes since start",
+    y = "Proportion of Agents",
+    color = "State",
+    fill = "State"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(legend.position = "top")
+
+## ---- WEEK plot ----
+plot_week <- plot_df %>%
+  filter(Type == "Week") %>%
+  ggplot(aes(x = Minutes, y = mean, color = State, fill = State)) +
+  geom_line(size = 1.2) +
+  geom_ribbon(aes(ymin = mean - se, ymax = mean + se), alpha = 0.18, color = NA) +
+  scale_color_manual(values = c("Believer" = "#D95F02", "Recovered" = "#1B9E77")) +
+  scale_fill_manual(values = c("Believer" = "#D95F02", "Recovered" = "#1B9E77")) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  facet_wrap(~ Environment) +
+  labs(
+    title = "Recovery and Resilience Dynamics — Week Simulation",
+    subtitle = "Mean ± SE of Believers and Recovered over Time (ABM Output)",
+    x = "Minutes since start",
+    y = "Proportion of Agents",
+    color = "State",
+    fill = "State"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(legend.position = "top")
+
+# 4. Print or save the plots
+print(plot_day)
+print(plot_week)
+
+# Save plots if desired
+ggsave("abm_recovery_resilience_day.png", plot = plot_day, width = 12, height = 7, dpi = 300)
+ggsave("abm_recovery_resilience_week.png", plot = plot_week, width = 12, height = 7, dpi = 300)
+
+```
+```{r}
+# Robust visualization code without environment conflicts
+ggplot(plot_data, aes(x = Hours)) +
+  geom_ribbon(aes(ymin = Mean - SE, ymax = Mean + SE, fill = Metric), alpha = 0.15) +
+  geom_line(aes(y = Mean, color = Metric), linewidth = 1) +
+  facet_wrap(~ Environment, nrow = 1) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_color_manual(
+    name = "Metric",
+    values = c("Recovery" = "#1B9E77", "Resilience" = "#D95F02")
+  ) +
+  scale_fill_manual(
+    name = "Metric",
+    values = c("Recovery" = "#1B9E77", "Resilience" = "#D95F02")
+  ) +
+  labs(
+    title = "Environmental Impact on Misinformation Dynamics",
+    subtitle = "Ribbons = ±1 SE | Recovery: Fact-checked agents | Resilience: Believer decline",
+    x = "Simulation Hours",
+    y = "Proportion of Agents"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "top",
+    panel.spacing = unit(15, "points"),  # Changed from lines to points
+    strip.text = element_text(face = "bold", size = 12),
+    legend.margin = margin(t = 0, unit = "pt")
+  )
+```
+
+
+```{r}
+# Step 1: Prepare summarized data with EmotionalValence as a factor
+final_plot_data <- all_data %>%
+  mutate(EmotionalValence = factor(EmotionalValence)) %>%
+  group_by(Environment, EmotionalValence, Minutes) %>%
+  summarise(
+    mean_recovered = mean(Prop_Recovered, na.rm = TRUE),
+    se_recovered = sd(Prop_Recovered, na.rm = TRUE)/sqrt(n()),
+    mean_believer = mean(Prop_Believer, na.rm = TRUE),
+    se_believer = sd(Prop_Believer, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = c(mean_recovered, mean_believer),
+    names_to = "Metric",
+    values_to = "Mean_Proportion"
+  ) %>%
+  mutate(
+    Metric = recode(Metric,
+                    mean_recovered = "Recovery (Fact-Checked)",
+                    mean_believer = "Resilience (Believers)"),
+    se = case_when(
+      Metric == "Recovery (Fact-Checked)" ~ se_recovered,
+      Metric == "Resilience (Believers)" ~ se_believer
+    )
+  )
+
+# Step 2: Create the plot
+ggplot(final_plot_data, aes(x = Minutes/60, y = Mean_Proportion, 
+                           color = EmotionalValence, fill = EmotionalValence)) +
+  geom_ribbon(aes(ymin = Mean_Proportion - se, ymax = Mean_Proportion + se), 
+              alpha = 0.15, color = NA) +
+  geom_line(size = 1) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  scale_x_continuous(n.breaks = 8) +
+  scale_color_viridis_d(option = "plasma", end = 0.9) +
+  scale_fill_viridis_d(option = "plasma", end = 0.9) +
+  facet_grid(Metric ~ Environment,
+             labeller = labeller(Environment = \(x) paste("Environment:", x))) +
+  labs(
+    title = "Emotional Misinformation Dynamics: Recovery and Resilience Across Environments",
+    subtitle = "Line = Mean proportion | Ribbon = ±1 SE | Higher valence = stronger emotional charge",
+    x = "Hours Since Simulation Start",
+    y = "Proportion of Agents",
+    color = "Emotional\nValence",
+    fill = "Emotional\nValence"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "top",
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold", size = 11),
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(color = "gray30", margin = margin(b = 15))
+  )
+
+```
+
+
+# OTHER CODE
+```{r}
+library(brms)
+
+library(dplyr)
+
+# Sort to ensure time order
+all_data <- all_data %>%
+  arrange(Run, Day, Time)
+
+# Compute lagged differences
+all_data <- all_data %>%
+  group_by(Run) %>%
+  mutate(
+    Delta_Recovered = Recovered - lag(Recovered, default = 0),
+    Delta_Believer = Believer - lag(Believer, default = 0),
+    Delta_Minutes = Minutes - lag(Minutes, default = 10),  # Assuming 10-min intervals
+    Recovery_Rate = Delta_Recovered / Delta_Minutes,
+    Belief_Rate = Delta_Believer / Delta_Minutes,
+    Misinformation_Load = Believer + Doubter + Disinformant
+  )
+
+ggplot(all_data, aes(x = Minutes, y = Recovery_Rate, color = Environment)) +
+  geom_line(alpha = 0.5) +
+  labs(
+    title = "Recovery Rate Over Time by Environment",
+    x = "Minutes since simulation start",
+    y = "Rate of Recovery (ΔRecovered / ΔMinutes)"
+  ) +
+  theme_minimal()
+
+```
+
+```{r}
+# Example assuming filenames like L1_V3_R1.csv → valence = 3
+all_data$EmotionalValence <- as.numeric(str_extract(all_data$Run, "(?<=_V)\\d+"))
+
+```
+
+
+# BAYESIAN:
+```{r}
+Sys.setenv(PATH = paste(
+  "D:/UNI/rtools44/usr/bin",
+  "D:/UNI/rtools44/mingw64/bin",
+  Sys.getenv("PATH"),
+  sep = ";"
+))
+cmdstanr::check_cmdstan_toolchain()
+
+# Filter out non-positive times
+rate_model_data <- all_data %>%
+  mutate(Recovery_Rate = ifelse(Recovery_Rate <= 0, 1e-6, Recovery_Rate))
+
+recovery_rate_model <- brm(
+  formula = Recovery_Rate ~ Environment * EmotionalValence + (1 | Run),
+  data = rate_model_data,
+  family = Gamma(link = "log"),  # FIXED
+  prior = c(
+    prior(normal(0, 2), class = "b"),
+    prior(gamma(1, 1), class = "shape"),
+    prior(normal(0, 2), class = "Intercept")
+  ),
+  iter = 2000,
+  chains = 4,
+  cores = 4,
+  control = list(adapt_delta = 0.95)
+)
+
+summary(recovery_rate_model)
+
+```
+
+```{r}
+# Arrange and group by Run for event detection
+all_data <- all_data %>% arrange(Run, Minutes)
+
+# Detect new recovery events (increase in Recovered count)
+all_data <- all_data %>%
+  group_by(Run) %>%
+  mutate(Recovered_lag = lag(Recovered, default = first(Recovered)),
+         New_Recoveries = Recovered - Recovered_lag) %>%
+  ungroup()
+
+# Filter to rows where new recoveries happened
+recovery_events <- all_data %>% filter(New_Recoveries > 0)
+
+```
+
+```{r}
+# Total recovery events by environment and run
+recovery_summary <- recovery_events %>%
+  group_by(Run, Environment) %>%
+  summarise(
+    Total_Recovery_Events = sum(New_Recoveries),
+    Mean_Time_Between_Recovery = mean(diff(Minutes), na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+print(recovery_summary)
+
+```
+
+```{r}
+ggplot(recovery_events, aes(x = Minutes, y = New_Recoveries, color = Environment)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(se = FALSE) +
+  labs(title = "New Recovery Events Over Time by Environment",
+       x = "Minutes since start", y = "Number of New Recoveries") +
+  theme_minimal()
+
+```
+
+```{r}
+library(survival)
+# Create a binary event column: did recovery occur at this time point?
+all_data <- all_data %>%
+  group_by(Run, Environment) %>%
+  mutate(Event = ifelse(New_Recoveries > 0, 1, 0)) %>%
+  ungroup()
+
+# Fit a Cox model for time to first recovery by environment
+cox_fit <- coxph(Surv(Minutes, Event) ~ Environment, data = all_data)
+summary(cox_fit)
+
+```
+
+```{r}
+# Combine summaries for reporting
+env_summary <- all_data %>%
+  group_by(Environment) %>%
+  summarise(
+    Mean_Prop_Recovered = mean(Prop_Recovered, na.rm = TRUE),
+    Max_Prop_Recovered = max(Prop_Recovered, na.rm = TRUE),
+    Total_Recovery_Events = sum(New_Recoveries, na.rm = TRUE),
+    Mean_Time_Between_Recovery = mean(diff(Minutes[New_Recoveries > 0]), na.rm = TRUE)
+  )
+
+print(env_summary)
+
+```
+
+```{r}
+ggplot(all_data, aes(x = Minutes, y = Recovered, color = Environment, group = interaction(Run, Environment))) +
+  geom_line(alpha = 0.5) +
+  labs(title = "Cumulative Recoveries Over Time by Environment",
+       x = "Minutes since start", y = "Cumulative Recovered") +
+  theme_minimal()
+
+```
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Example: Proportion Recovered over time by Environment and Run
+ggplot(all_data, aes(x = Minutes, y = Prop_Recovered, color = Environment, group = interaction(Run, Environment))) +
+  geom_line(alpha = 0.4) +
+  facet_wrap(~ EmotionalValence) +
+  labs(title = "Recovery Dynamics by Environment and Emotional Valence",
+       x = "Minutes since start", y = "Proportion Recovered") +
+  theme_minimal()
+
+```
+
+```{r}
+# Summarize for boxplot
+summary_data <- all_data %>%
+  group_by(Run, Environment, EmotionalValence) %>%
+  summarise(Time_to_First_Recovery = min(Minutes[Recovered > 0], na.rm = TRUE),
+            Max_Prop_Recovered = max(Prop_Recovered, na.rm = TRUE))
+
+# Boxplot
+ggplot(summary_data, aes(x = Environment, y = Time_to_First_Recovery, fill = Environment)) +
+  geom_boxplot() +
+  facet_wrap(~ EmotionalValence) +
+  labs(title = "Time to First Recovery by Environment and Emotional Valence",
+       y = "Minutes to First Recovery") +
+  theme_minimal()
+
+```
+
+```{r}
+# Calculate new recovery events
+all_data <- all_data %>%
+  group_by(Run, Environment) %>%
+  arrange(Minutes) %>%
+  mutate(New_Recoveries = Recovered - lag(Recovered, default = first(Recovered))) %>%
+  ungroup()
+
+# Aggregate by time bin
+all_data$Time_Bin <- cut(all_data$Minutes, breaks = seq(0, max(all_data$Minutes), by = 60))
+
+recovery_events <- all_data %>%
+  group_by(Environment, EmotionalValence, Time_Bin) %>%
+  summarise(Total_New_Recoveries = sum(New_Recoveries, na.rm = TRUE))
+
+ggplot(recovery_events, aes(x = Time_Bin, y = Total_New_Recoveries, fill = Environment)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~ EmotionalValence) +
+  labs(title = "New Recovery Events per Hour by Environment and Emotional Valence",
+       x = "Time Bin", y = "New Recoveries") +
+  theme_minimal()
+
+```
+
+```{r}
+ggplot(all_data, aes(x = Minutes, y = Believer, color = Environment, group = interaction(Run, Environment))) +
+  geom_line(alpha = 0.3) +
+  facet_wrap(~ EmotionalValence) +
+  labs(title = "Believers Over Time: Evidence of Resilience?",
+       y = "Number of Believers") +
+  theme_minimal()
+
+```
+
+```{r}
+# Add lagged columns for each state
+df <- df %>%
+  mutate(
+    Susceptible_prev = lag(Susceptible, default = Susceptible[1]),
+    Exposed_prev     = lag(Exposed, default = Exposed[1]),
+    Believer_prev    = lag(Believer, default = Believer[1]),
+    Doubter_prev     = lag(Doubter, default = Doubter[1]),
+    Recovered_prev   = lag(Recovered, default = Recovered[1])
+  )
+# Example: Estimate Believer to Recovered transitions
+df <- df %>%
+  mutate(
+    Believer_to_Recovered = pmax(0, Recovered - Recovered_prev),
+    Susceptible_to_Believer = pmax(0, Believer - Believer_prev)
+    # Add other transitions as needed
+  )
+# Gather transitions into long format
+sankey_data <- df %>%
+  select(Environment, Believer_to_Recovered, Susceptible_to_Believer) %>%
+  pivot_longer(cols = c(Believer_to_Recovered, Susceptible_to_Believer),
+               names_to = "Transition", values_to = "Count") %>%
+  filter(Count > 0)
+
+# Map transition names to source/target
+sankey_data <- sankey_data %>%
+  mutate(
+    Source = case_when(
+      Transition == "Believer_to_Recovered" ~ "Believer",
+      Transition == "Susceptible_to_Believer" ~ "Susceptible"
+    ),
+    Target = case_when(
+      Transition == "Believer_to_Recovered" ~ "Recovered",
+      Transition == "Susceptible_to_Believer" ~ "Believer"
+    )
+  )
+
+```
+
+```{r}
+library(networkD3)
+
+# Prepare nodes and links for Sankey
+nodes <- data.frame(name = unique(c(sankey_data$Source, sankey_data$Target)))
+links <- sankey_data %>%
+  left_join(nodes %>% mutate(SourceID = row_number() - 1), by = c("Source" = "name")) %>%
+  left_join(nodes %>% mutate(TargetID = row_number() - 1), by = c("Target" = "name")) %>%
+  select(SourceID, TargetID, Count)
+
+# Sankey plot
+sankeyNetwork(
+  Links = links,
+  Nodes = nodes,
+  Source = "SourceID",
+  Target = "TargetID",
+  Value = "Count",
+  NodeID = "name",
+  fontSize = 12,
+  nodeWidth = 30
+)
+
+```
+
+```{r}
+# Example: Calculate transitions for the whole data
+states <- c("Susceptible", "Exposed", "Believer", "Doubter", "Recovered")
+transitions <- matrix(0, nrow = length(states), ncol = length(states), dimnames = list(states, states))
+
+# Fill in transitions (simplified example)
+transitions["Believer", "Recovered"] <- sum(df$Believer_to_Recovered, na.rm = TRUE)
+transitions["Susceptible", "Believer"] <- sum(df$Susceptible_to_Believer, na.rm = TRUE)
+# Add other transitions as needed
+
+# Normalize rows to get probabilities
+transition_matrix <- transitions / rowSums(transitions)
+print(transition_matrix)
+
+```
+
