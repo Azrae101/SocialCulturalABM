@@ -1,0 +1,705 @@
+---
+title: "Soccult_ABM_exam"
+author: "Reka Forgo"
+date: "`r Sys.Date()`"
+output: html_document
+---
+Variables:
+Day,Time,Susceptible,Exposed,Believer,Doubter,Recovered,Disinformant,Total_Misinformed
+
+Read all files from here: ~/SocCult/Data
+
+Sanity checks in this folder: ~/SocCult/Data
+
+0 research question here: ~/SocCult/Data/RQ0
+
+1 research question here: ~/SocCult/Data/RQ1
+
+2 research question here: ~/SocCult/Data/RQ2
+
+3 research question here: Day: ~/SocCult/Data/RQ3
+
+```{r}
+# Libraries
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(hms)
+library(lubridate)
+library(stringr)
+library(purrr)
+
+
+# Define your specific colors
+state_colors <- c(
+  "Susceptible"   = "#00FF00",
+  "Exposed"       = "#FFFF00",
+  "Believer"      = "#FF0000",
+  "Doubter"       = "#0000FF",
+  "Recovered"     = "#A9A9A9",
+  "Disinformant"  = "#800080"
+)
+
+```
+
+
+#RQ3 (RF)
+Methods for RQ3
+To test the differences in the misinformation spread influenced by distribution of population, simulations were run on different Susceptible-Doubter ratios (10%–90% to 90% - 10%) with fixed Disinformant counts (n = 1) and α levels (1, 5, 10). Metrics track Believers and Recovered counts over time, to reveal short-term adoption versus long-term retention dynamics.
+
+
+```{r}
+#load in files for RQ3
+#files are stored in ~/SocCult/Data/RQ3, we need to read in all data files, and store them with a simulation ID, as in simulations.csv and Filename column.
+
+# 1. List all RQ3 files
+files <- list.files(
+  path       = "~/SocCult/Data/RQ3/daily",
+  pattern    = "^RQ3_\\d+_\\d+_\\d+[ad]_.*\\.csv$",
+  full.names = TRUE
+)
+
+# 2. Read & tag with regex captures for ratio, valence, and runType
+rq3_raw <- files %>%
+  set_names() %>%
+  map_dfr(read.csv, .id = "filepath") %>%
+  mutate(
+    fn = basename(filepath),
+    caps = str_match(fn, "^RQ3_(\\d+_\\d+)_(\\d+)([ad])_.*\\.csv$"),
+    pop_ratio = caps[,2],
+    valence   = as.integer(caps[,3]),
+    runType   = caps[,4]
+  ) %>%
+  select(-fn, -caps)
+
+# 3. Convert columns to appropriate types
+rq3_raw$Day <- as.numeric(rq3_raw$Day)
+rq3_raw$Time <- parse_hm(rq3_raw$Time)
+rq3_raw$Susceptible <- as.numeric(rq3_raw$Susceptible)
+rq3_raw$Exposed <- as.numeric(rq3_raw$Exposed)
+rq3_raw$Believer <- as.numeric(rq3_raw$Believer)
+rq3_raw$Doubter <- as.numeric(rq3_raw$Doubter)
+rq3_raw$Recovered <- as.numeric(rq3_raw$Recovered)
+rq3_raw$Disinformant <- as.numeric(rq3_raw$Disinformant)
+rq3_raw$Total_Misinformed <- as.numeric(rq3_raw$Total_Misinformed)
+
+# 4. Long format
+rq3_long <- rq3_raw %>%
+  pivot_longer(
+    cols      = Susceptible:Recovered,    # melt only these 6 columns
+    names_to  = "Agent_Group",               # new column with the old names
+    values_to = "Count"                      # new column with their values
+  )
+
+# 5. Show the first few rows
+head(rq3_long)
+
+rq3_long <- rq3_long %>%
+  filter(Day!= 2)# remove lines where Day = 2)
+
+```
+
+```{r}
+#prep for plotting., average agent type counts across population distribtuions by time
+rq3_avg <- rq3_long %>%
+  # no valence in grouping → collapse across it
+  group_by(pop_ratio, runType, Agent_Group, Day, Time) %>%
+  summarise(
+    MeanCount = mean(Count, na.rm = TRUE),
+    .groups   = "drop"
+  )
+
+library(scales) 
+
+ggplot(rq3_avg, aes(
+    x     = Time,
+    y     = MeanCount,
+    colour = Agent_Group,
+    group  = Agent_Group
+  )) +
+  #geom_smooth(size=0.5) +
+  geom_line(size=0.5) +
+  scale_x_time(limits = c(as_hms("07:00:00"), as_hms("24:00:00")),
+    breaks = breaks_width("4 hours"),
+    labels = label_time("%H:%M")) +
+  facet_wrap(~ pop_ratio) +
+  scale_color_manual(values = state_colors) +
+  labs(
+    title = "RQ3: Agent Group Counts by Population Distribution",
+    x     = "Time",
+    y     = "Mean Count"
+  ) +
+  theme_minimal() +
+  theme(legend.position="bottom")
+
+```
+
+```{r}
+#Plot without avg -ing over emotional valences
+# 1) Summarise *with* valence (not collapsing it)
+rq3_avg_day <- rq3_long %>%
+  group_by(pop_ratio, valence, Agent_Group, Time) %>%
+  summarise(
+    MeanCount = mean(Count, na.rm = TRUE),
+    .groups   = "drop"
+  ) %>%
+  ungroup() %>%
+  mutate(
+    valence = factor(valence, levels = c(1,5,10),
+                     labels = c("Low (1)","Mid (5)","High (10)"))
+  )
+
+# 2) Plot with facet_grid(valence ~ pop_ratio)
+ggplot(rq3_avg_day, aes(x = Time, y = MeanCount,
+                        colour = Agent_Group, group = Agent_Group)) +
+  geom_line(size = 0.3) +
+  #geom_smooth(size = 0.5, method = "gam", se = FALSE) +
+  facet_grid(rows = vars(valence), cols = vars(pop_ratio),
+             switch = "y", scales = "fixed") +
+  scale_x_time(
+    breaks = breaks_width("4 hours"),
+    limits = c(as_hms("07:00:00"), as_hms("24:00:00")),
+    labels = label_time("%H:%M")
+  ) +
+  scale_color_manual(values = state_colors) +
+  labs(
+    title = "RQ3: Daily Agent counts by Valence & Population Mix",
+    x     = "Hour of Day",
+    y     = "Mean Count"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    strip.placement     = "outside",
+    strip.text.y.left   = element_text(angle = 0),
+    axis.text.x = element_text(angle = 65, hjust = 1),
+    legend.position     = "bottom",
+    panel.grid.minor    = element_blank()
+  ) 
+```
+
+
+
+
+#Week, RQ3
+
+```{r}
+#same with weekly data
+# 1. List all RQ3 files
+files2 <- list.files(
+  path       = "~/SocCult/Data/RQ3/weekly",
+  pattern    = "^RQ3_\\d+_\\d+_\\d+[bd]_.*\\.csv$",
+  full.names = TRUE
+)
+
+# 2. Read & tag with regex captures for ratio, valence, and runType
+rq3_raw2 <- files2 %>%
+  set_names() %>%
+  map_dfr(read.csv, .id = "filepath") %>%
+  mutate(
+    fn = basename(filepath),
+    # regex: group1=“pop1_pop2”, group2=valence, group3=‘a’ or ‘d’
+    caps = str_match(fn, "^RQ3_(\\d+_\\d+)_(\\d+)([bd])_.*\\.csv$"),
+    pop_ratio = caps[,2],
+    valence   = as.integer(caps[,3]),
+    runType   = caps[,4]
+  ) %>%
+  select(-fn, -caps)
+
+# 3. Convert columns to appropriate types
+rq3_raw2$Day <- as.numeric(rq3_raw2$Day)
+rq3_raw2$Time <- parse_hm(rq3_raw2$Time)
+rq3_raw2$Susceptible <- as.numeric(rq3_raw2$Susceptible)
+rq3_raw2$Exposed <- as.numeric(rq3_raw2$Exposed)
+rq3_raw2$Believer <- as.numeric(rq3_raw2$Believer)
+rq3_raw2$Doubter <- as.numeric(rq3_raw2$Doubter)
+rq3_raw2$Recovered <- as.numeric(rq3_raw2$Recovered)
+rq3_raw2$Disinformant <- as.numeric(rq3_raw2$Disinformant)
+rq3_raw2$Total_Misinformed <- as.numeric(rq3_raw2$Total_Misinformed)
+
+# 4. Long format
+rq3_long2 <- rq3_raw2 %>%
+  pivot_longer(
+    cols      = Susceptible:Recovered,    # melt only these 6 columns
+    names_to  = "Agent_Group",               # new column with the old names
+    values_to = "Count"                      # new column with their values
+  )
+
+# 5. Show the first few rows
+head(rq3_long2)
+
+
+library(lubridate)
+
+# choose an arbitrary origin – here “Day 1 at midnight”
+origin <- as_datetime("2025-01-01 00:00:00", tz = "UTC")
+
+rq3_long2 <- rq3_long2 %>%
+  mutate(
+    DateTime = origin + days(Day - 1) + Time)
+
+```
+
+```{r}
+#prep for plotting., average agent type counts across population distribtuions by time
+rq3_avg2 <- rq3_long2 %>%
+  # no valence in grouping → collapse across it
+  group_by(pop_ratio, runType, Agent_Group, DateTime) %>%
+  summarise(
+    MeanCount = mean(Count, na.rm = TRUE),
+    .groups   = "drop"
+  )
+
+#create a plot with 9 subplots, one for each population distribution group (pop_ratio), have counts on the y axis and time on the x axis, with different colors for each agent group (Susceptible, Exposed, Believer, Doubter, Recovered).
+
+ggplot(rq3_avg2, aes(
+    x     = DateTime,
+    y     = MeanCount,
+    colour = Agent_Group,
+    group  = Agent_Group
+  )) +
+  #geom_smooth(size=0.5) +
+  geom_line(size=0.5) +
+  facet_wrap(~ pop_ratio) +
+  scale_color_manual(values = state_colors) +
+  labs(
+    title = "RQ3: Agent Group Counts by Population Distribution",
+    x     = "DateTime",
+    y     = "Mean Count"
+  ) +
+  theme_minimal() +
+  theme(legend.position="bottom")
+```
+
+```{r}
+
+rq3_long2 <- rq3_long2 %>%
+  filter(Day!= 8) # remove lines where Day = 8)
+
+rq3_avg2 <- rq3_long2 %>%
+  group_by(pop_ratio, valence, Agent_Group, DateTime) %>%  # keep valence
+  summarise(
+    MeanCount = mean(Count, na.rm = TRUE),
+    .groups   = "drop"
+  ) %>%
+  ungroup() %>%
+  mutate(
+    valence = factor(valence, levels = c(1, 5, 10),
+                     labels = c("Low (1)", "Mid (5)", "High (10)"))
+  )
+
+ggplot(rq3_avg2, aes(x = DateTime, y = MeanCount,
+                    colour = Agent_Group, group = Agent_Group)) +
+  geom_line(size = 0.3) +
+  #geom_smooth(size = 0.5, method = "gam", se = FALSE) +
+  facet_grid(rows = vars(valence), cols = vars(pop_ratio),
+             scales = "fixed", switch = "y") +
+  scale_color_manual(values = state_colors) +
+  scale_x_datetime(
+    date_breaks = "1 day",        # one tick per day
+    labels = function(x) day(x)           # just the day number (1–31)
+  ) +
+  labs(
+    title = "RQ3: Agent Counts over a week by Valence and Population Mix",
+    x     = "Date",
+    y     = "Population Counts Mean"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    strip.placement = "outside",
+    strip.text.y.left = element_text(angle = 0),
+    legend.position = "bottom"
+  )
+```
+
+
+```{r}
+# --- DAILY per‐run means ---
+daily_run_summary <- rq3_raw %>%
+  # keep filepath as your run ID
+  group_by(run_id = filepath, pop_ratio, valence) %>%
+  summarise(
+    Mean_Believer  = mean(Believer,  na.rm=TRUE),
+    Mean_Exposed   = mean(Exposed,   na.rm=TRUE),
+    Mean_Recovered = mean(Recovered, na.rm=TRUE),
+    .groups="drop"
+  ) %>%
+  transmute(
+    TimeType = "Day",
+    Ratio    = pop_ratio,
+    Alpha    = valence,
+    Mean_Believer, Mean_Exposed, Mean_Recovered
+  )
+
+# --- WEEKLY per‐run means ---
+weekly_run_summary <- rq3_raw2 %>%
+  # if you dropped filepath earlier, re‐read or keep it in your pipeline
+  group_by(run_id = filepath, pop_ratio, valence) %>%
+  summarise(
+    Mean_Believer  = mean(Believer,  na.rm=TRUE),
+    Mean_Exposed   = mean(Exposed,   na.rm=TRUE),
+    Mean_Recovered = mean(Recovered, na.rm=TRUE),
+    .groups="drop"
+  ) %>%
+  transmute(
+    TimeType = "Week",
+    Ratio    = pop_ratio,
+    Alpha    = valence,
+    Mean_Believer, Mean_Exposed, Mean_Recovered
+  )
+
+all_summaries <- bind_rows(daily_run_summary, weekly_run_summary)
+
+```
+
+
+```{r}
+
+# Load all RQ3 summary files
+
+
+mean_cols <- c("Mean_Believer", "Mean_Recovered")
+mean_cols <- mean_cols[mean_cols %in% colnames(all_summaries)]
+
+plot_data <- all_summaries %>%
+  select(TimeType, Ratio, Alpha, all_of(mean_cols)) %>%
+  pivot_longer(
+    cols = all_of(mean_cols),
+    names_to = "Agent",
+    values_to = "Mean"
+  ) %>%
+  mutate(Alpha = factor(Alpha))
+
+p_box <- ggplot(plot_data, aes(x = Ratio, y = Mean, fill = Agent)) +
+  geom_boxplot(alpha = 0.7, outlier.size = 0.1, size = 0.1) +
+  facet_grid(TimeType ~ Alpha, scales = "free_x", space = "free") +
+  scale_fill_manual(values = c(
+    "Mean_Believer" = "#FF0000",
+    "Mean_Recovered" = "#A9A9A9"
+  )) +
+  labs(
+    title = "Distribution of Mean Agent Percentages by Ratio and Influence Strength",
+    subtitle = "Faceted by TimeType (Day vs Week) and Influence Strength (α)",
+    x = "Susceptible:Doubter Ratio",
+    y = "Mean Percentage",
+    fill = "Agent Type"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom",
+    strip.text = element_text(face = "bold")
+  )
+
+#ggsave("RQ3_Boxplot_Misinformation_Red.png", p_box, width = 14, height = 8, dpi = 300)
+print(p_box)
+
+
+```
+
+```{r}
+library(zoo)  # for rollapply
+
+# Full R pipeline for RQ3: separate daily vs. weekly dynamics plots
+# 1a. Compute mean across runs
+rq3_mean_day <- rq3_raw %>%
+  group_by(Disinformant, valence, Time) %>%
+  summarise(
+    Exposed  = mean(Exposed,  na.rm = TRUE),
+    Believer = mean(Believer, na.rm = TRUE),
+    .groups  = "drop"
+  )
+
+# 1b. Compute instantaneous speeds & smooth
+rq3_rates_day <- rq3_mean_day %>%
+  arrange(Disinformant, valence, Time) %>%
+  group_by(Disinformant, valence) %>%
+  mutate(
+    dt_mins    = as.numeric(difftime(Time, lag(Time), units = "mins")),
+    dE         = Exposed  - lag(Exposed),
+    dB         = Believer - lag(Believer),
+    speed_E2B  = -dE / dt_mins * 1440,
+    speed_B2R  = -dB / dt_mins * 1440,
+    smooth_E2B = rollapply(speed_E2B, 3, mean, partial = TRUE, align = "center"),
+    smooth_B2R = rollapply(speed_B2R, 3, mean, partial = TRUE, align = "center")
+  ) %>%
+  filter(!is.na(dt_mins) & dt_mins > 0) %>%
+  ungroup()
+
+# 1c. Pivot for plotting
+rq3_plot_day <- rq3_rates_day %>%
+  select(Disinformant, valence, Time, smooth_E2B, smooth_B2R) %>%
+  pivot_longer(
+    cols      = c(smooth_E2B, smooth_B2R),
+    names_to  = "Transition",
+    values_to = "Speed"
+  ) %>%
+  mutate(
+    Transition = recode(Transition,
+      smooth_E2B = "E → B (infection)",
+      smooth_B2R = "B → R (recovery)"
+    )
+  )
+
+# 1d. Plot daily dynamics
+p_day <- ggplot(rq3_plot_day,
+                aes(x = Time, y = Speed,
+                    colour = factor(valence), group = valence)) +
+  geom_line(size = 0.4) +
+  #geom_smooth(method = "gam", se = FALSE, size = 0.6) +
+  scale_colour_manual(
+    name   = expression(valence),
+    values = c("1"="yellow","5"="green","10"="blue")
+  ) +
+  facet_grid(Transition ~ Disinformant, scales = "fixed") +
+  #ylim(0, 30) +
+  theme_minimal(base_size = 10) +
+  theme(
+    legend.position   = "bottom",
+    strip.text.y.left = element_text(angle = 0),
+    axis.text.x       = element_text(angle = 45, hjust = 1)
+  ) +
+  labs(
+    title = "RQ3 – Daily Dynamics",
+    x     = "Simulation time",
+    y     = "Speed"
+  )
+
+# -------------------------
+# 2. WEEKLY SIMULATION PIPE
+# -------------------------
+
+
+rq3_raw2 <- rq3_raw2 %>%
+  mutate(
+    DateTime = origin + days(Day - 1) + Time)
+
+# 2a. Compute mean across runs
+rq3_mean_week <- rq3_raw2 %>%
+  group_by(Disinformant, valence, DateTime) %>%
+  summarise(
+    Exposed  = mean(Exposed,  na.rm = TRUE),
+    Believer = mean(Believer, na.rm = TRUE),
+    .groups  = "drop"
+  )
+# 2b. compute speeds in days → agents/day
+rq3_rates_week <- rq3_mean_week %>%
+  arrange(Disinformant, valence, DateTime) %>%
+  group_by(Disinformant, valence) %>%
+  mutate(
+    dt_days    = as.numeric(difftime(DateTime, lag(DateTime), units = "mins")),
+    dE         = Exposed  - lag(Exposed),
+    dB         = Believer - lag(Believer),
+    speed_E2B  = -dE / dt_days,     # agents per day
+    speed_B2R  = -dB / dt_days,
+    smooth_E2B = rollapply(speed_E2B, 3, mean, partial = TRUE, align = "center"),
+    smooth_B2R = rollapply(speed_B2R, 3, mean, partial = TRUE, align = "center")
+  ) %>%
+  filter(dt_days > 0) %>%
+  ungroup()
+
+# 2c. pivot + compute simple week‐index
+rq3_plot_week <- rq3_rates_week %>%
+  select(Disinformant, valence, DateTime, smooth_E2B, smooth_B2R) %>%
+  pivot_longer(
+    c(smooth_E2B, smooth_B2R),
+    names_to  = "Transition",
+    values_to = "Speed"
+  ) %>%
+  mutate(
+    Transition = recode(Transition,
+      smooth_E2B = "E → B (infection)",
+      smooth_B2R = "B → R (recovery)"
+    ))
+
+# 2d. plot with a single continuous scale
+p_week <- ggplot(rq3_plot_week,
+                 aes(x = DateTime, y = Speed,
+                     colour = factor(valence), group = valence)) +
+  geom_line(size = 0.4) +
+  #geom_smooth(method = "gam", se = FALSE, size = 0.4) +
+  scale_colour_manual(
+    name   = expression(valence),
+    values = c("1"="orange","5"="green","10"="blue")
+  ) +
+  facet_grid(Transition ~ Disinformant, scales = "fixed") +
+  scale_x_datetime(
+    date_breaks = "2 day",        # one tick per day
+    labels = function(x) day(x)           # just the day number (1–31)
+  ) +
+  #xlim(as_datetime("2025-01-01 07:07:00", tz = "UTC"),
+   #    as_datetime("2025-01-07 24:00:00", tz = "UTC")) +
+  #ylim(0, 30) +
+  theme_minimal(base_size = 10) +
+  theme(
+    legend.position   = "bottom",
+    strip.text.y.left = element_text(angle = 0),
+    axis.text.x       = element_text(angle = 45, hjust = 1)
+  ) +
+  labs(
+    title = "RQ3 – Weekly Dynamics",
+    y     = "Speed"
+  )
+# --------------------------
+# 3. DISPLAY BOTH SIDE BY SIDE
+# --------------------------
+p_day 
+p_week
+
+```
+```{r}
+# -------------------------
+# 1. DAILY DYNAMICS PIPELINE
+# -------------------------
+
+# 1a. Compute mean across runs, including pop_ratio
+rq3_mean_day <- rq3_raw %>%
+  group_by(Disinformant, valence, pop_ratio, Time) %>%
+  summarise(
+    Exposed  = mean(Exposed,  na.rm = TRUE),
+    Believer = mean(Believer, na.rm = TRUE),
+    .groups  = "drop"
+  )
+
+# 1b. Compute instantaneous speeds & smooth
+rq3_rates_day <- rq3_mean_day %>%
+  arrange(Disinformant, valence, pop_ratio, Time) %>%
+  group_by(Disinformant, valence, pop_ratio) %>%
+  mutate(
+    dt_mins    = as.numeric(difftime(Time, lag(Time), units = "mins")),
+    dE         = Exposed  - lag(Exposed),
+    dB         = Believer - lag(Believer),
+    speed_E2B  = - dE / dt_mins,      # convert per‐minute → per‐day
+    speed_B2R  = - dB / dt_mins,
+    smooth_E2B = rollapply(speed_E2B, 5, mean, partial = TRUE, align = "center"),
+    smooth_B2R = rollapply(speed_B2R, 5, mean, partial = TRUE, align = "center")
+  ) %>%
+  filter(!is.na(dt_mins) & dt_mins > 0) %>%
+  ungroup()
+
+# 1c. Pivot to long form for ggplot
+rq3_plot_day <- rq3_rates_day %>%
+  select(Disinformant, valence, pop_ratio, Time, smooth_E2B, smooth_B2R) %>%
+  pivot_longer(
+    cols      = c(smooth_E2B, smooth_B2R),
+    names_to  = "Transition",
+    values_to = "Speed"
+  ) %>%
+  mutate(
+    pop_ratio  = factor(pop_ratio),
+    Transition = recode(Transition,
+      smooth_E2B = "E → B (infection)",
+      smooth_B2R = "B → R (recovery)"
+    )
+  )
+
+# 1d. Plot daily dynamics with facets by Disinformant × pop_ratio
+p_day <- ggplot(rq3_plot_day,
+                aes(x = Time, y = Speed,
+                    colour = factor(valence), group = valence)) +
+  #geom_line(size = 0.3, alpha = 0.6) +
+  geom_smooth(method = "loess", se = FALSE, size = 0.5) +
+  scale_colour_manual(
+    name   = expression(valence),
+    values = c("1"="orange","5"="green","10"="blue")
+  ) +
+  facet_grid(
+    Transition ~ pop_ratio,
+    scales   = "fixed",
+    labeller = label_both
+  ) +
+  theme_minimal(base_size = 8) +
+  theme(
+    legend.position   = "bottom",
+    strip.text.y.left = element_text(angle = 0),
+    axis.text.x       = element_text(angle = 45, hjust = 1)
+  ) +
+  labs(
+    title = "RQ3 – Daily Dynamics",
+    x     = "Simulation time",
+    y     = "Speed"
+  )
+
+# -------------------------
+# 2. WEEKLY DYNAMICS PIPELINE
+# -------------------------
+
+# 2a. Compute DateTime from Day + Time, and mean across runs
+rq3_mean_week <- rq3_raw2 %>%
+  mutate(
+    DateTime = origin + days(Day - 1) + Time
+  ) %>%
+  group_by(Disinformant, valence, pop_ratio, DateTime) %>%
+  summarise(
+    Exposed  = mean(Exposed,  na.rm = TRUE),
+    Believer = mean(Believer, na.rm = TRUE),
+    .groups  = "drop"
+  )
+
+# 2b. Compute speeds in agents/day & smooth
+rq3_rates_week <- rq3_mean_week %>%
+  arrange(Disinformant, valence, pop_ratio, DateTime) %>%
+  group_by(Disinformant, valence, pop_ratio) %>%
+  mutate(
+    dt_days    = as.numeric(difftime(DateTime, lag(DateTime), units = "mins")),
+    dE         = Exposed  - lag(Exposed),
+    dB         = Believer - lag(Believer),
+    speed_E2B  = - dE / dt_days,     # agents per day
+    speed_B2R  = - dB / dt_days,
+    smooth_E2B = rollapply(speed_E2B, 5, mean, partial = TRUE, align = "center"),
+    smooth_B2R = rollapply(speed_B2R, 5, mean, partial = TRUE, align = "center")
+  ) %>%
+  filter(!is.na(dt_days) & dt_days > 0) %>%
+  ungroup()
+
+# 2c. Pivot to long form
+rq3_plot_week <- rq3_rates_week %>%
+  select(Disinformant, valence, pop_ratio, DateTime, smooth_E2B, smooth_B2R) %>%
+  pivot_longer(
+    cols      = c(smooth_E2B, smooth_B2R),
+    names_to  = "Transition",
+    values_to = "Speed"
+  ) %>%
+  mutate(
+    pop_ratio  = factor(pop_ratio),
+    Transition = recode(Transition,
+      smooth_E2B = "E → B (infection)",
+      smooth_B2R = "B → R (recovery)"
+    )
+  )
+
+# 2d. Plot weekly dynamics with same facet structure
+p_week <- ggplot(rq3_plot_week,
+                 aes(x = DateTime, y = Speed,
+                     colour = factor(valence), group = valence)) +
+  #geom_line(size = 0.3, alpha = 0.6) +
+  geom_smooth(method = "loess", se = FALSE, size = 0.5) +
+  scale_colour_manual(
+    name   = expression(valence),
+    values = c("1"="orange","5"="green","10"="blue")
+  ) +
+  facet_grid(
+    Transition ~ pop_ratio,
+    scales   = "fixed",
+    labeller = label_both
+  ) +
+  scale_x_datetime(
+    date_breaks = "2 day",
+    labels      = function(x) day(x)
+  ) +
+  theme_minimal(base_size = 8) +
+  theme(
+    legend.position   = "bottom",
+    strip.text.y.left = element_text(angle = 0),
+    axis.text.x       = element_text(angle = 45, hjust = 1)
+  ) +
+  labs(
+    title = "RQ3 – Weekly Dynamics",
+    x     = "Date",
+    y     = "Speed"
+  )
+
+p_day
+p_week
+```
+
+

@@ -1,0 +1,588 @@
+---
+title: "Soccult_ABM_exam"
+author: "Reka Forgo"
+date: "`r Sys.Date()`"
+output: html_document
+---
+Variables:
+Day,Time,Susceptible,Exposed,Believer,Doubter,Recovered,Disinformant,Total_Misinformed
+
+Read all files from here: ~/SocCult/Data
+
+Sanity checks in this folder: ~/SocCult/Data
+
+0 research question here: ~/SocCult/Data/RQ0
+
+1 research question here: ~/SocCult/Data/RQ1
+
+2 research question here: ~/SocCult/Data/RQ2
+
+3 research question here: Day: ~/SocCult/Data/RQ3
+
+```{r}
+# Libraries
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(hms)
+library(scales)
+library(lubridate)
+library(zoo)
+# Define your specific colors
+state_colors <- c(
+  "Susceptible"   = "#00FF00",
+  "Exposed"       = "#FFFF00",
+  "Believer"      = "#FF0000",
+  "Doubter"       = "#0000FF",
+  "Recovered"     = "#A9A9A9",
+  "Disinformant"  = "#800080"
+)
+
+```
+
+#RQ2 (RF)
+Methods for RQ2
+
+Simulations to measure at what α does misinformation influence doubters, simulations were run to test populations of 29 Doubters + 1 Disinformant and 28 Doubters + 2 Disinformants, with sweeping α from 1 to 10. The Believer fraction is measured at 24 hours to identify the minimum α where Believers exceed 10%.
+
+
+
+```{r}
+#load in files for RQ2
+#files are stored in ~/SocCult/Data/RQ2, we need to read in all data files, and store them with a simulation ID, as in simulations.csv and Filename column.
+library(dplyr)
+library(purrr)
+library(stringr)
+library(tidyr)
+
+data_dir <- "~/SocCult/Data/RQ2_5"
+files <- list.files(data_dir, "\\.csv$", full.names = TRUE)
+
+file_info <- tibble(
+  path  = files,
+  fname = basename(path)
+) %>%
+  # regex: RQ2_alpha_Param2[_YYYYMMDD_HHMMSS].csv
+  mutate(m = str_match(
+    fname,
+    "^RQ2_(\\d+)_(\\d+)(?:_(\\d{8})_(\\d{6}))?\\.csv$"
+  )) %>%
+  { 
+    bad <- filter(., is.na(m[,1]))$fname
+    if (length(bad)) stop(
+      "Filename pattern error on:\n", paste(bad, collapse = "\n")
+    ) else .
+  } %>%
+  transmute(
+    path,
+    alpha       = as.numeric(m[,2]),
+    Param2      = as.integer(m[,3]),
+    fileDate    = if_else(
+                    !is.na(m[,4]),
+                    as.character(as.Date(m[,4], format = "%Y%m%d")),
+                    NA_character_
+                  ),
+    fileTime    = if_else(
+                    !is.na(m[,5]),
+                    format(strptime(m[,5], "%H%M%S"), "%H:%M:%S"),
+                    NA_character_
+                  )
+  ) %>%
+  arrange(path) %>%
+  mutate(Replication = row_number())
+
+# read and attach
+df_all <- file_info %>%
+  mutate(data = map(path, read.csv, stringsAsFactors = FALSE)) %>%
+  select(-path) %>%
+  unnest(data)
+
+# df_all now has: alpha, Param2, fileDate, fileTime, Replication, plus original CSV columns.
+
+#remove filedate and file time columns
+df_all <- df_all %>% select(-fileDate, -fileTime, -Param2)
+
+#unique values in alpha columns
+
+#how many lines are there / disinformant count?
+
+
+```
+
+```{r}
+# 4) Convert columns to appropriate types
+
+df_all$Day <- as.numeric(df_all$Day)
+#remove lines where Day = 2
+df_all <- df_all %>% filter(Day != 2) #(60 lines)
+
+
+
+# Or, if it’s a character "HH:MM":
+df_all$Time <- parse_hm(df_all$Time)
+
+#convert agent group  counts to numeric
+df_all$Susceptible <- as.numeric(df_all$Susceptible)
+df_all$Exposed <- as.numeric(df_all$Exposed)
+df_all$Believer <- as.numeric(df_all$Believer)
+df_all$Doubter <- as.numeric(df_all$Doubter)
+df_all$Recovered <- as.numeric(df_all$Recovered)
+df_all$Disinformant <- as.factor(df_all$Disinformant)
+df_all$Total_Misinformed <- as.numeric(df_all$Total_Misinformed)
+
+#long format
+df_long <- df_all %>% 
+  pivot_longer(
+    cols      = Susceptible:Recovered,    # melt only these 6 columns
+    names_to  = "Agent_Group",               # new column with the old names
+    values_to = "Count"                      # new column with their values
+  )
+
+#show df_long
+head(df_long)
+
+
+
+```
+
+
+```{r}
+library(dplyr)
+library(lubridate)
+
+df_peaks_all <- df_long %>%
+  # include every Agent_Group
+  group_by(Disinformant, alpha, Agent_Group) %>%
+  # pick the single time‐point with the maximum Count per subgroup
+  slice_max(Count, with_ties = FALSE) %>%
+  ungroup() %>%
+  # compute time‐to‐peak as hours since start
+  mutate(
+    TimeToPeakH = (Day - 1) * 24 +
+                  hour(Time) +
+                  minute(Time) / 60
+  ) %>%
+  transmute(
+    Disinformant,
+    alpha,
+    Agent_Group,
+    PeakDay     = Day,
+    PeakTime    = Time,
+    PeakCount   = Count,
+    TimeToPeakH
+  ) %>%
+  arrange(Disinformant, alpha, Agent_Group)
+
+print(df_peaks_all)
+
+#save peaks all csv
+write.csv(df_peaks_all, file = "~/SocCult/Data/RQ2_peaks_all.csv", row.names = FALSE)
+
+```
+
+```{r}
+# 1. Compute the mean count per α × Agent_Group × Time
+df_plot1 <- df_long %>%
+  filter(Disinformant == 1) %>%                # only Disinformant = 1
+  group_by(alpha, Agent_Group, Time) %>%
+  summarise(MeanCount = mean(Count, na.rm = TRUE), .groups = "drop")
+
+# 2. Plot: one facet per α, time‐series of each agent group
+ggplot(df_plot1, aes(
+    x      = Time,
+    y      = MeanCount,
+    colour = Agent_Group,
+    group  = Agent_Group
+  )) +
+  scale_color_manual(values = state_colors) +
+  geom_line(size = 0.5) +
+  facet_wrap(~ alpha, ncol = 5) +                     # 10 panels, 5 across
+  scale_x_time(                                       # if Time is hms/Period
+    breaks = breaks_width("4 hours"),
+    labels = label_time("%H:%M")
+  ) +
+  labs(
+    title = "Agent Group Trajectories Over Time by α",
+    x     = "Time of Day",
+    y     = "Mean Agent Count",
+    colour = "Agent Group"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  )
+
+# 1. Compute the mean count per α × Agent_Group × Time
+df_plot2 <- df_long %>%
+  filter(Disinformant == 2) %>%                # only Disinformant = 1
+  group_by(alpha, Agent_Group, Time) %>%
+  summarise(MeanCount = mean(Count, na.rm = TRUE), .groups = "drop")
+
+# 2. Plot: one facet per α, time‐series of each agent group
+ggplot(df_plot2, aes(
+    x      = Time,
+    y      = MeanCount,
+    colour = Agent_Group,
+    group  = Agent_Group
+  )) +
+  scale_color_manual(values = state_colors) +
+  geom_line(size = 0.5) +
+  facet_wrap(~ alpha, ncol = 5) +                     # 10 panels, 5 across
+  scale_x_time(                                       # if Time is hms/Period
+    breaks = breaks_width("4 hours"),
+    labels = label_time("%H:%M")
+  ) +
+  labs(
+    title = "Agent Group Trajectories Over Time by α",
+    x     = "Time of Day",
+    y     = "Mean Agent Count",
+    colour = "Agent Group"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  )
+#for disinformant = 3
+
+df_plot3 <- df_long %>%
+  filter(Disinformant == 3) %>%                # only Disinformant = 1
+  group_by(alpha, Agent_Group, Time) %>%
+  summarise(MeanCount = mean(Count, na.rm = TRUE), .groups = "drop")
+# 2. Plot: one facet per α, time‐series of each agent group
+ggplot(df_plot3, aes(
+    x      = Time,
+    y      = MeanCount,
+    colour = Agent_Group,
+    group  = Agent_Group
+  )) +
+  scale_color_manual(values = state_colors) +
+  geom_line(size = 0.5) +
+  facet_wrap(~ alpha, ncol = 5) +                     # 10 panels, 5 across
+  scale_x_time(                                       # if Time is hms/Period
+    breaks = breaks_width("4 hours"),
+    labels = label_time("%H:%M")
+  ) +
+  labs(
+    title = "Agent Group Trajectories Over Time by α",
+    x     = "Time of Day",
+    y     = "Mean Agent Count",
+    colour = "Agent Group"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  )
+
+# for disinformant = 4
+df_plot4 <- df_long %>%
+  filter(Disinformant == 4) %>%                # only Disinformant = 4
+  group_by(alpha, Agent_Group, Time) %>%
+  summarise(MeanCount = mean(Count, na.rm = TRUE), .groups = "drop")
+
+# 2. Plot: one facet per α, time‐series of each agent group
+ggplot(df_plot4, aes(
+    x      = Time,
+    y      = MeanCount,
+    colour = Agent_Group,
+    group  = Agent_Group
+  )) +
+  scale_color_manual(values = state_colors) +
+  geom_line(size = 0.5) +
+  facet_wrap(~ alpha, ncol = 5) +                     # 10 panels, 5 across
+  scale_x_time(                                       # if Time is hms/Period
+    breaks = breaks_width("4 hours"),
+    labels = label_time("%H:%M")
+  ) +
+  labs(
+    title = "Agent Group Trajectories Over Time by α",
+    x     = "Time of Day",
+    y     = "Mean Agent Count",
+    colour = "Agent Group"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  )
+
+# for disinformant = 5
+df_plot4 <- df_long %>%
+  filter(Disinformant == 5) %>%    
+  group_by(alpha, Agent_Group, Time) %>%
+  summarise(MeanCount = mean(Count, na.rm = TRUE), .groups = "drop")
+
+# 2. Plot: one facet per α, time‐series of each agent group
+ggplot(df_plot4, aes(
+    x      = Time,
+    y      = MeanCount,
+    colour = Agent_Group,
+    group  = Agent_Group
+  )) +
+  scale_color_manual(values = state_colors) +
+  geom_line(size = 0.5) +
+  facet_wrap(~ alpha, ncol = 5) +                     # 10 panels, 5 across
+  scale_x_time(                                       # if Time is hms/Period
+    breaks = breaks_width("4 hours"),
+    labels = label_time("%H:%M")
+  ) +
+  labs(
+    title = "Agent Group Trajectories Over Time by α",
+    x     = "Time of Day",
+    y     = "Mean Agent Count",
+    colour = "Agent Group"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  )
+
+
+
+```
+
+
+```{r}
+# 1. average across reps, keep both Disinformant regimes
+df_avg <- df_long %>%
+  filter(Agent_Group %in% c("Believer","Doubter")) %>%
+  group_by(Disinformant, alpha, Agent_Group, Time) %>%
+  summarise(MeanCount = mean(Count), .groups = "drop")
+
+# 2. one plot: colour=α, linetype=Agent_Group, thin lines, facet by Disinformant
+ggplot(df_avg, aes(
+    x       = Time,
+    y       = MeanCount,
+    colour  = factor(alpha),
+    linetype = Agent_Group,
+    group    = interaction(alpha, Agent_Group)
+  )) +
+  geom_line(size = 0.5) +  
+  geom_hline(
+    yintercept = 3,
+    linetype   = "dashed",
+    colour     = "red",
+    size       = 0.3) +
+  scale_linetype_manual(
+    values = c("Believer" = "solid", "Doubter" = "dashed")
+  ) +
+  scale_x_time(                                     
+    breaks = breaks_width("4 hours"),
+    labels = label_time("%H:%M")
+  ) +
+  facet_wrap(~ Disinformant, nrow = 1, labeller = label_both) +
+  labs(
+    title    = "Mean Believer vs. Doubter Trajectories by α",
+    x        = "Time",
+    y        = "Mean Count",
+    colour   = expression(alpha),
+    linetype = "Agent Group"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        axis.text.x  = element_text(angle = 45, hjust = 1))
+
+
+```
+```{r}
+#now instead of believer plot total misinformed
+
+# 1. Average the Total_Misinformed column over repetitions
+df_mis <- df_long %>%
+  group_by(Disinformant, alpha, Time) %>%
+  summarise(
+    MeanMisinformed = mean(Total_Misinformed),
+    .groups = "drop"
+  )
+
+# 2. Plot one thin line per α, red dashed threshold at y=3, faceted by Disinformant
+ggplot(df_mis, aes(
+    x      = Time,
+    y      = MeanMisinformed,
+    colour = factor(alpha),
+    group  = alpha
+  )) +
+  geom_hline(
+    yintercept   = 3,
+    linetype     = "dashed",
+    colour       = "red",
+    size         = 0.3) +
+  geom_smooth (size=0.5, method="gam", se = FALSE) +
+  #geom_line(size = 0.5) +
+  facet_wrap(~ Disinformant, nrow = 1, labeller = label_both) +
+  labs(
+    title  = "Mean Total-Misinformed Over Time by α",
+    x      = "Time",
+    y      = "Mean Misinformed",
+    colour = expression(alpha)
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        axis.text.x  = element_text(angle = 45, hjust = 1))
+
+#export df_long to a csv
+
+write.csv(df_long, file = "~/SocCult/RQ2_df_long.csv", row.names = FALSE)
+
+
+```
+
+```{r}
+
+ggplot(df_mis, aes(
+    x      = Time,
+    y      = MeanMisinformed,
+    colour = alpha,      # use numeric alpha here
+    group  = factor(alpha)
+  )) +
+  geom_hline(
+    yintercept   = 3,
+    linetype     = "dashed",
+    colour       = "red",
+    size         = 0.3
+  ) +
+  #geom_line(size=0.5, alpha=0.6) +
+  geom_smooth(size=0.5, method="gam", se = FALSE) +
+  facet_wrap(~ Disinformant, nrow = 1, labeller = label_both) +
+  # continuous colour gradient from α = 1 (light) to α = 10 (dark)
+  scale_colour_gradient(
+    low    = "yellow",
+    high   = "darkblue",
+    limits = c(1, 10),
+    breaks = 1:10,
+    name   = expression(alpha)
+  ) +
+  labs(
+    title  = "Mean Total-Misinformed Over Time by α",
+    x      = "Time",
+    y      = "Mean Misinformed"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        axis.text.x  = element_text(angle = 45, hjust = 1))
+
+```
+```{r}
+
+
+df_all2 <- df_all %>% rename(t = Time)
+
+df_mean <- df_all2 %>%
+  group_by(Disinformant, alpha, t) %>%
+  summarise(
+    Exposed  = mean(Exposed,  na.rm=TRUE),
+    Believer = mean(Believer, na.rm=TRUE),
+    .groups  = "drop"
+  )
+
+# 3. Compute diffs & empirical speeds within each (Disinformant, α)
+df_rates <- df_mean %>%
+  arrange(Disinformant, alpha, t) %>%
+  group_by(Disinformant, alpha) %>%
+  mutate(
+    dt_mins    = as.numeric(difftime(t, lag(t), units="mins")),
+    dE         = Exposed  - lag(Exposed),
+    dB         = Believer - lag(Believer),
+    speed_E2B  = -dE        / dt_mins,       # agents/day
+    speed_B2R  = -dB        / dt_mins,
+    smooth_E2B = rollapply(speed_E2B, 9, mean,
+                           partial=TRUE, align="center"),
+    smooth_B2R = rollapply(speed_B2R, 9, mean,
+                           partial=TRUE, align="center")
+  ) %>%
+  filter(dt_mins > 0) %>%
+  ungroup()
+
+# 4. Pivot longer for ggplot
+df_plot <- df_rates %>%
+  select(Disinformant, alpha, t, smooth_E2B, smooth_B2R) %>%
+  pivot_longer(
+    cols      = c(smooth_E2B, smooth_B2R),
+    names_to  = "Transition",
+    values_to = "Speed"
+  ) %>%
+  mutate(
+    Transition = recode(Transition,
+      smooth_E2B = "E → B",
+      smooth_B2R = "B → R"
+    )
+  )
+
+#have the scales the same on both y axes
+
+ggplot(df_plot, aes(x = t, y = Speed, colour = alpha)) +
+  geom_line(na.rm = TRUE, alpha = 0.1, size = 0.5) +
+  geom_smooth(aes(group = factor(alpha)), method = "loess", se = FALSE, size = 0.5) +
+  scale_colour_gradient(
+    low    = "yellow",
+    high   = "darkblue",
+    limits = c(1, 10),
+    breaks = 1:10,
+    name   = expression(alpha)
+  ) +
+  # separate rows for infection vs. recovery, columns for each Disinformant
+  facet_grid(Transition ~ Disinformant, scales = "free_y") +
+  labs(
+    x      = "Time",
+    y      = "Speed",
+    colour = expression(alpha),
+    title  = "Infection vs. Recovery Speeds by Disinformant count & α"
+  )  +
+  #scale_y_continuous(limits = c(-0.02, 0.02)) +
+  ylim(-0.02, 0.02) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    axis.text.x     = element_text(angle = 45, hjust = 1)
+  )
+
+
+```
+
+```{r}
+
+
+# 1. Average the Total_Misinformed column over repetitions
+df_mis <- df_all %>%
+  group_by(Disinformant, alpha, Time) %>%
+  summarise(
+    MeanMisinformed = mean(Believer),
+    .groups = "drop"
+  )
+
+# 2. Plot one thin line per α, red dashed threshold at y=3, faceted by Disinformant
+ggplot(df_mis, aes(
+    x      = Time,
+    y      = MeanMisinformed,
+    colour = factor(alpha),
+    group  = alpha
+  )) +
+  geom_hline(
+    yintercept   = 3,
+    linetype     = "dashed",
+    colour       = "red",
+    size         = 0.3) +
+  geom_smooth (size=0.5, method="gam", se = FALSE) +
+  #geom_line(size = 0.5) +
+  facet_wrap(~ Disinformant, nrow = 1, labeller = label_both) +
+  labs(
+    title  = "Mean Total-Misinformed Over Time by α",
+    x      = "Time",
+    y      = "Mean Misinformed",
+    colour = expression(alpha)
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        axis.text.x  = element_text(angle = 45, hjust = 1))
+
+#export df_long to a csv
+
+#write.csv(df_long, file = "~/SocCult/RQ2_df_long.csv", row.names = FALSE)
+
+
+```
+
+
